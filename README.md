@@ -64,7 +64,7 @@ Instalação (exemplo)
 3. Clone o repositório:
    - git clone https://github.com/caiofreitas23/jogo_pif.git
 4. Entre na pasta do projeto:
-   - cd jogo_pif
+   - cd codigo_jogo
 
 Compilação e execução (exemplos)
 --------------------------------
