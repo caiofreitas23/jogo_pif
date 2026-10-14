@@ -3,7 +3,7 @@ Contribuintes: Caio Freitas, Gabriel Furtado, João Pedro Guedes
 
 Descrição
 --------
-Jogo PIF é um roguelike do tipo "Boss Rush" escrito em linguagem C. O jogador enfrenta apenas chefões — sem inimigos comuns —, cada um com padrões de ataque únicos que precisam ser aprendidos e dominados (estilo Dark Souls). Partidas são curtas (até ~40 minutos). Ao morrer, o jogador recomeça do zero; entre chefes vencidos o jogador recebe upgrades permanentes temporários para a sessão. O objetivo do projeto é ter combates desafiadores, estrutura simples e alta rejogabilidade.
+Beyond the Fallen é um roguelike do tipo "Boss Rush" escrito em linguagem C. O jogador enfrenta apenas chefões — sem inimigos comuns —, cada um com padrões de ataque únicos que precisam ser aprendidos e dominados (estilo Dark Souls). Partidas são curtas (até ~40 minutos). Ao morrer, o jogador recomeça do zero; entre chefes vencidos o jogador recebe upgrades permanentes temporários para a sessão. O objetivo do projeto é ter combates desafiadores, estrutura simples e alta rejogabilidade.
 
 Principais ideias
 -----------------
@@ -141,7 +141,7 @@ Escolha uma licença antes de publicar (recomendado: MIT). Se preferir, inclua u
 
 Contato
 -------
-- Maintainer: caiofreitas23
+- Maintainer: caiofreitas23, jpgacl, gb_miller
 - Email / GitHub Issues: use o sistema de Issues do repositório para reportar bugs e solicitar features.
 
 Notas finais
