@@ -1,8 +1,8 @@
-# Beyond the Limits — Roguelike Boss Rush (projeto em C)
+# Beyond the Fallen — Roguelike Boss Rush (projeto em C)
 
 Descrição
 --------
-Beyond the Limits é um roguelike do tipo "Boss Rush" escrito em linguagem C. O jogador enfrenta apenas chefões — sem inimigos comuns —, cada um com padrões de ataque únicos que precisam ser aprendidos e dominados (estilo Dark Souls). Partidas são curtas (até ~40 minutos). Ao morrer, o jogador recomeça do zero; entre chefes vencidos o jogador recebe upgrades temporários para a sessão. O objetivo do projeto é ter combates desafiadores, estrutura simples e alta rejogabilidade.
+Beyond the Fallen é um roguelike do tipo "Boss Rush" escrito em linguagem C. O jogador enfrenta apenas chefões — sem inimigos comuns —, cada um com padrões de ataque únicos que precisam ser aprendidos e dominados (estilo Dark Souls). Partidas são curtas (até ~40 minutos). Ao morrer, o jogador recomeça do zero; entre chefes vencidos o jogador recebe upgrades temporários para a sessão. O objetivo do projeto é ter combates desafiadores, estrutura simples e alta rejogabilidade.
 
 Principais ideias
 -----------------
@@ -22,7 +22,7 @@ Funcionalidades previstas
 - Modos de jogo: Arcade e Sequência.
 - Tela de menu, seleção de modo, e placar (para Arcade).
 - Balanceamento e ajuste de dificuldade.
-- Sistema simples de áudio (opcional) e efeitos visuais (dependendo da biblioteca escolhida).
+- Sistema simples de áudio (opcional) e efeitos visuais (usando raylib).
 - Logs ou modo de depuração para teste de padrões dos chefes.
 
 Regras de jogo e mecânicas (sugestão)
@@ -42,15 +42,13 @@ Controles (sugestão padrão — altere conforme a implementação)
 - Bloquear / Parry: L ou tecla C (opcional)
 - Pausar/Menu: Esc
 
-Observação: controles podem ser configuráveis e dependem da biblioteca escolhida (terminal, SDL2 etc.).
+Observação: controles podem ser configuráveis e dependem da implementação usando raylib.
 
 Dependências e ambiente
 -----------------------
-Opções (dependem da UI escolhida):
 - Compilador C (GCC/Clang) com suporte a C11
 - make (opcional)
-- Biblioteca de terminal: ncurses (se for versão em terminal)
-- Biblioteca gráfica: SDL2 (se for versão com janelas/gráficos)
+- raylib (biblioteca gráfica) — instalar via gerenciador de pacotes ou compilar a partir do source
 - math.h (libm) para funções matemáticas, conforme necessário
 
 Instalação (exemplo)
@@ -58,9 +56,10 @@ Instalação (exemplo)
 1. Instale um compilador C:
    - Linux: sudo apt install build-essential
    - macOS: Xcode Command Line Tools (xcode-select --install)
-2. Instale dependências opcionais:
-   - ncurses (terminal): sudo apt install libncurses5-dev libncursesw5-dev
-   - SDL2 (gráficos): sudo apt install libsdl2-dev
+2. Instale raylib:
+   - Ubuntu/Debian (pacote pode variar): sudo apt install libraylib-dev (ou siga instruções em https://www.raylib.com)
+   - macOS: brew install raylib
+   - Alternativa: construir raylib a partir do source conforme instruções oficiais: https://github.com/raysan5/raylib
 3. Clone o repositório:
    - git clone https://github.com/caiofreitas23/jogo_pif.git
 4. Entre na pasta do projeto:
@@ -72,52 +71,25 @@ Compilação e execução (exemplos)
 --------------------------------
 Exemplo genérico com GCC (arquivo na raiz):
 ```bash
-gcc -Wall -Wextra -O2 -std=c11 -o beyond codigo_jogo.c -lm
-./beyond
+gcc -Wall -Wextra -O2 -std=c11 -o beyond_fallen codigo_jogo.c -lraylib -lm
+./beyond_fallen
 ```
 
-Se usar ncurses:
+Usando pkg-config (mais portável):
 ```bash
-gcc -Wall -Wextra -O2 -std=c11 -o beyond codigo_jogo.c -lncurses -lm
-./beyond
+gcc -Wall -Wextra -O2 -std=c11 $(pkg-config --cflags raylib) -o beyond_fallen codigo_jogo.c $(pkg-config --libs raylib) -lm
+./beyond_fallen
 ```
 
-Se usar SDL2:
-```bash
-gcc -Wall -Wextra -O2 -std=c11 `sdl2-config --cflags` -o beyond codigo_jogo.c `sdl2-config --libs` -lm
-./beyond
-```
-
-Sugestão de Makefile (exemplo mínimo)
--------------------------------------
-Coloque um arquivo `Makefile` na raiz com algo como:
-
-```makefile
-CC = gcc
-CFLAGS = -Wall -Wextra -O2 -std=c11
-LDLIBS = -lm
-TARGET = beyond
-SRCS = codigo_jogo.c
-
-all:
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRCS) $(LDLIBS)
-
-run: all
-	./$(TARGET)
-
-clean:
-	rm -f $(TARGET)
-```
-
-Adapte `LDLIBS` para `-lncurses` ou `$(shell sdl2-config --libs)` conforme necessário.
+Sugestão de Makefile (exemplo mínimo) — veja arquivo Makefile separado abaixo.
 
 Estrutura sugerida do projeto
 -----------------------------
-/ (ou /src se preferir) — onde colocar codigo_jogo.c e outros arquivos .c/.h  
-/assets — imagens, sons, fontes (se aplicável)  
-/docs — documentação adicional / notas de design  
-Makefile  
-README.md
+- / (ou /src se preferir) — onde colocar `codigo_jogo.c` e outros arquivos .c/.h  
+- /assets — imagens, sons, fontes (se aplicável)  
+- /docs — documentação adicional / notas de design  
+- Makefile  
+- README.md
 
 Checklist de desenvolvimento — O que precisa ser feito
 -----------------------------------------------------
@@ -136,8 +108,8 @@ Média prioridade
 - Ferramentas de balanceamento (modos debug).
 
 Baixa prioridade / melhorias
-- Efeitos sonoros e música (SDL2_mixer ou similar).
-- Animações e sprites (se usar SDL2).
+- Efeitos sonoros e música (raylib supports basic audio; considere mixers externos se precisar).
+- Animações e sprites (usar formatos suportados por raylib).
 - Mais chefes e variações de patterns.
 - IA mais sofisticada, dificuldade adaptativa.
 - Localização (i18n), telas de tutorial.
@@ -146,11 +118,11 @@ Como avaliar / instruções para professores
 -----------------------------------------
 Requisitos mínimos para rodar:
 - GCC/Clang instalado
-- Dependências (ncurses ou SDL2) conforme o modo implementado
+- raylib instalado (ou compilado) conforme o modo implementado
 
 Para compilar e rodar:
 - executar os comandos de compilação descritos acima (ou apenas `make` se houver Makefile)
-- executar `./beyond` (ou o nome do executável gerado)
+- executar `./beyond_fallen` (ou o nome do executável gerado)
 
 Dica: inclua no repositório um Makefile com targets `make` e `make run` para facilitar avaliação.  
 Indique no README qualquer dependência específica e versões testadas.
@@ -166,14 +138,11 @@ Licença
 -------
 Escolha uma licença antes de publicar. Recomendado: MIT. Para adicionar MIT, crie um arquivo LICENSE com o texto padrão MIT e inclua seu nome/ano.
 
-Exemplo breve (incluir arquivo LICENSE real em vez deste texto):
-- MIT License — ver o arquivo LICENSE no repositório.
-
 Contato
 -------
-- Maintainer: caiofreitas23, jpgacl, gb_miller  
+- Maintainer: caiofreitas23  
 - Para bugs e features: use o sistema de Issues do repositório
 
 Notas finais
 ------------
-Este README sintetiza a ideia do projeto e fornece um plano de implementação e avaliação. Ajuste controles, dependências e instruções de compilação conforme a arquitetura final (terminal vs. janela gráfica) e as bibliotecas escolhidas. Se `codigo_jogo.c` estiver em um subdiretório, atualize os comandos de compilação e o Makefile para apontar para o caminho correto.
+Este README sintetiza a ideia do projeto e fornece um plano de implementação e avaliação. Ajuste controles, dependências e instruções de compilação conforme a arquitetura final e as bibliotecas escolhidas. Se `codigo_jogo.c` estiver em um subdiretório, atualize os comandos de compilação e o Makefile para apontar para o caminho correto.
