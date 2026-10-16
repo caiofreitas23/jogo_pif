@@ -38,7 +38,7 @@ Controles (sugestão padrão — altere conforme a implementação)
 ------------------------------------------------------------
 - Movimento: WASD ou setas
 - Atacar: J ou tecla Z / Espaço
-- Esquivar: K ou tecla X / Shift
+- Esquivar: Q ou tecla Shift
 - Bloquear / Parry: L ou tecla C (opcional)
 - Pausar/Menu: Esc
 
