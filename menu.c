@@ -251,8 +251,10 @@ int main(void) {
     som_pulo = GerarSomPulo();
     som_clique = GerarSomClique();
 
-    Personagem jogador, chefao;
     EstadoJogo estado = ESTADO_MENU_INICIAL;
+    EstadoJogo estado_anterior = ESTADO_MENU_INICIAL;
+
+    Personagem jogador, chefao;
     ModoJogo modo_atual = MODO_HISTORIA;
 
     int fase_atual = 1;
@@ -270,9 +272,15 @@ int main(void) {
     while (!WindowShouldClose()) {
         float dt = GetFrameTime();
 
-        // Tecla de Pause
-        if ((IsKeyPressed(KEY_E) || IsKeyPressed(KEY_P)) && (estado == ESTADO_JOGANDO || estado == ESTADO_EXPLORACAO || estado == ESTADO_PAUSADO)) {
-            estado = (estado == ESTADO_PAUSADO) ? ((modo_atual == MODO_HISTORIA && jogador.vida > 0 && chefao.vida > 0) ? ESTADO_JOGANDO : ESTADO_EXPLORACAO) : ESTADO_PAUSADO;
+        if (IsKeyPressed(KEY_E) || IsKeyPressed(KEY_P)) {
+            if (estado == ESTADO_PAUSADO) {
+                // Retorna exatamente para a tela onde o jogo estava antes do pause
+                estado = estado_anterior;
+            } else if (estado == ESTADO_JOGANDO || estado == ESTADO_EXPLORACAO) {
+                // Guarda se o jogador estava na arena ou no mapa antes de pausar
+                estado_anterior = estado;
+                estado = ESTADO_PAUSADO;
+            }
         }
 
         // -------------------------------------------------------------
@@ -651,8 +659,9 @@ int main(void) {
                 DrawRectangle(0, 0, LARGURA_TELA, ALTURA_TELA, (Color){ 0, 0, 0, 180 });
                 DrawText("PAUSADO", LARGURA_TELA/2 - MeasureText("PAUSADO", 36)/2, 100, 36, RAYWHITE);
 
+                // Voltar para o estado correto (Arena do Arcade, Arena da História ou Mapa)
                 if (DesenharBotao((Rectangle){ LARGURA_TELA/2 - 100, 180, 200, 45 }, "CONTINUAR", (Color){ 41, 128, 185, 255 }, (Color){ 52, 152, 219, 255 })) {
-                    estado = (modo_atual == MODO_HISTORIA && jogador.vida > 0 && chefao.vida > 0) ? ESTADO_JOGANDO : ((modo_atual == MODO_HISTORIA) ? ESTADO_EXPLORACAO : ESTADO_JOGANDO);
+                    estado = estado_anterior;
                 }
 
                 // O botão SALVAR JOGO aparece apenas se estiver no MODO HISTÓRIA
