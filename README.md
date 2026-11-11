@@ -1,148 +1,71 @@
-# Beyond the Fallen — Roguelike Boss Rush (projeto em C)
+# Beyond the Fallen
 
-Descrição
---------
-Beyond the Fallen é um roguelike do tipo "Boss Rush" escrito em linguagem C. O jogador enfrenta apenas chefões — sem inimigos comuns —, cada um com padrões de ataque únicos que precisam ser aprendidos e dominados (estilo Dark Souls). Partidas são curtas (até ~40 minutos). Ao morrer, o jogador recomeça do zero; entre chefes vencidos o jogador recebe upgrades temporários para a sessão. O objetivo do projeto é ter combates desafiadores, estrutura simples e alta rejogabilidade.
+**Beyond the Fallen** é um jogo de ação e combate desenvolvido em C como projeto da matéria de Programação Imperativa e Funcional (PIF), da CESAR School. A aventura se passa em um gulag cercado pela neve, onde um prisioneiro precisa sobreviver aos confrontos, aprender habilidades e encontrar uma saída.
 
-Principais ideias
------------------
-- Apenas chefões (bosses) com padrões distintos.
-- Progressão baseada em upgrades obtidos a cada chefe derrotado.
-- Dois modos propostos:
-  - Arcade: sobreviver e derrotar o máximo de chefes possível em uma única sessão.
-  - Campanha/Sequência: sequência fixa/progressiva de chefes até zerar.
-- Partidas curtas, foco em aprendizado de padrões e tomada de decisão.
-- Rejogabilidade por design: variação de chefes, upgrades e dificuldades.
+> **Status:** conceito e desenvolvimento em andamento. Os detalhes e as mecânicas descritos aqui representam a proposta do jogo e podem mudar durante a implementação.
 
-Funcionalidades previstas
--------------------------
-- Sistema de combate básico (ataque, esquiva, bloqueio/opcional).
-- Inteligência/padrões diferentes por chefão.
-- Sistema de upgrades entre lutas (melhorias de dano, defesa, esquiva, habilidades especiais).
-- Modos de jogo: Arcade e Sequência.
-- Tela de menu, seleção de modo, e placar (para Arcade).
-- Balanceamento e ajuste de dificuldade.
-- Sistema simples de áudio (opcional) e efeitos visuais (usando raylib).
-- Logs ou modo de depuração para teste de padrões dos chefes.
+## História
 
-Regras de jogo e mecânicas (sugestão)
-------------------------------------
-- Vida do jogador reduzida por acertos dos chefes; se chegar a 0, reinício da sessão.
-- Cada chefe possui 2–4 padrões de ataque (telegráficos) que o jogador deve identificar.
-- Depois de derrotar um chefe, o jogador escolhe 1 upgrade entre 2–3 opções.
-- Tempo máximo por partida: ~40 minutos (para sessões de avaliação/tempo limitado).
-- Arcade: acumula pontos por chefe derrotado; após morrer, é exibido placar.
-- Sequência: objetivos e desafios progressivos até o "final boss".
+Você é um prisioneiro soviético em um gulag. Para conquistar a liberdade, terá de enfrentar outros detentos — cada um com sua própria história, personalidade e estilo de luta.
 
-Controles (sugestão padrão — altere conforme a implementação)
-------------------------------------------------------------
-- Movimento: WASD ou setas
-- Atacar: J ou tecla Z / Espaço
-- Esquivar: Q ou tecla Shift
-- Bloquear / Parry: L ou tecla C (opcional)
-- Pausar/Menu: Esc
+Enquanto avança, você poderá aprender novas habilidades e encontrar armas brancas para aumentar suas chances de sobreviver. Mas o gulag guarda mistérios além das arenas: perto do portão, é possível ouvir batidas e gritos, enquanto homens de jaleco entram e saem de uma porta carregando seringas.
 
-Observação: controles podem ser configuráveis e dependem da implementação usando raylib.
+O que acontece ali? E o que o último desafio tem a ver com isso?
 
-Dependências e ambiente
------------------------
-- Compilador C (GCC/Clang) com suporte a C11
-- make (opcional)
-- raylib (biblioteca gráfica) — instalar via gerenciador de pacotes ou compilar a partir do source
-- math.h (libm) para funções matemáticas, conforme necessário
+## Progressão e chefes
 
-Instalação (exemplo)
---------------------
-1. Instale um compilador C:
-   - Linux: sudo apt install build-essential
-   - macOS: Xcode Command Line Tools (xcode-select --install)
-2. Instale raylib:
-   - Ubuntu/Debian (pacote pode variar): sudo apt install libraylib-dev (ou siga instruções em https://www.raylib.com)
-   - macOS: brew install raylib
-   - Alternativa: construir raylib a partir do source conforme instruções oficiais: https://github.com/raysan5/raylib
-3. Clone o repositório:
-   - git clone https://github.com/caiofreitas23/jogo_pif.git
-4. Entre na pasta do projeto:
-   - cd jogo_pif
+A campanha apresenta confrontos contra chefes com características e padrões de combate próprios. Entre os adversários planejados estão:
 
-Observação: este repositório contém o arquivo `codigo_jogo.c` na raiz — os exemplos abaixo assumem este layout. Se `codigo_jogo.c` estiver em outro diretório (ex.: `src/`), ajuste os caminhos conforme necessário.
+- **Bobrovsky** — um russo corpulento, preso por trair a pátria. Sua força e seu tamanho fazem dele um adversário difícil de derrubar.
+- **Vladimir** — um lituano ágil e habilidoso. Apesar de rápido, o medo pode atrapalhar suas decisões.
+- **Ivan** — um bielorrusso muito forte, mas lento. Seus golpes são perigosos, porém podem ser evitados com atenção.
+- **Anastasia** — o desafio final. O nome pode sugerir uma criança de oito anos, mas...
 
-Compilação e execução (exemplos)
---------------------------------
-Exemplo genérico com GCC (arquivo na raiz):
-```bash
-gcc -Wall -Wextra -O2 -std=c11 -o beyond_fallen codigo_jogo.c -lraylib -lm
-./beyond_fallen
-```
+Ao vencer os desafios, o jogador poderá desenvolver novas habilidades e usar armas encontradas durante a jornada.
 
-Usando pkg-config (mais portável):
-```bash
-gcc -Wall -Wextra -O2 -std=c11 $(pkg-config --cflags raylib) -o beyond_fallen codigo_jogo.c $(pkg-config --libs raylib) -lm
-./beyond_fallen
-```
+## Mundo e cenários
 
-Sugestão de Makefile (exemplo mínimo) — veja arquivo Makefile separado abaixo.
+O gulag funciona como um mapa fechado para explorar. Entre os confrontos, o jogador poderá circular por áreas como:
 
-Estrutura sugerida do projeto
------------------------------
-- / (ou /src se preferir) — onde colocar `codigo_jogo.c` e outros arquivos .c/.h  
-- /assets — imagens, sons, fontes (se aplicável)  
-- /docs — documentação adicional / notas de design  
-- Makefile  
-- README.md
+- A cela;
+- O refeitório;
+- A área central;
+- O corredor de entrada e saída.
 
-Checklist de desenvolvimento — O que precisa ser feito
------------------------------------------------------
-Alta prioridade
-- Definir engine básica de combate (input, loop de jogo, colisões).
-- Implementar sistema de entidades (player e boss).
-- Criar 3 chefes iniciais com padrões distintos (tutorial + 2 chefs).
-- Implementar seleção de upgrades entre chefes.
-- Implementar morte e reinício de sessão (reset de progressão temporária).
-- Implementar build/run simples e README (este arquivo).
+O corredor próximo ao portão abriga um mistério que se revela aos poucos por meio de sons e da movimentação dos homens de jaleco.
 
-Média prioridade
-- Tela de menu e seleção de modo (Arcade / Sequência).
-- Sistema de pontuação para Arcade.
-- Salvamento local de melhores pontuações.
-- Ferramentas de balanceamento (modos debug).
+A direção visual proposta é simples e fria, com neve, pedra e estruturas austeras. A batalha final terá uma arena de pedra marcada por tremores, reforçando a força do confronto.
 
-Baixa prioridade / melhorias
-- Efeitos sonoros e música (raylib supports basic audio; considere mixers externos se precisar).
-- Animações e sprites (usar formatos suportados por raylib).
-- Mais chefes e variações de patterns.
-- IA mais sofisticada, dificuldade adaptativa.
-- Localização (i18n), telas de tutorial.
+## Combate
 
-Como avaliar / instruções para professores
------------------------------------------
-Requisitos mínimos para rodar:
-- GCC/Clang instalado
-- raylib instalado (ou compilado) conforme o modo implementado
+O sistema de combate foi pensado para ser direto e acessível, com opções como:
 
-Para compilar e rodar:
-- executar os comandos de compilação descritos acima (ou apenas `make` se houver Makefile)
-- executar `./beyond_fallen` (ou o nome do executável gerado)
+- Atacar;
+- Esquivar;
+- Defender;
+- Pular;
+- Travar a mira no adversário;
+- Usar armas brancas e itens.
 
-Dica: inclua no repositório um Makefile com targets `make` e `make run` para facilitar avaliação.  
-Indique no README qualquer dependência específica e versões testadas.
+Cada chefe exige atenção aos seus movimentos e ao momento certo para atacar ou se defender.
 
-Contribuição
-------------
-- Abra um issue descrevendo a proposta antes de implementar grandes mudanças.
-- Faça branch com nome `feature/<nome>` ou `fix/<nome>`.
-- Envie pull requests com descrição clara e testes (se aplicável).
-- Mantenha commits pequenos e com mensagens descritivas.
+## Destaques
 
-Licença
--------
-Escolha uma licença antes de publicar. Recomendado: MIT. Para adicionar MIT, crie um arquivo LICENSE com o texto padrão MIT e inclua seu nome/ano.
+- Ambientação inspirada em um gulag da URSS;
+- Chefes com histórias, personalidades e estilos de luta diferentes;
+- Progressão com novas habilidades e armas;
+- Exploração de um mapa fechado entre os combates;
+- Mistérios espalhados pelo gulag;
+- Diálogos com humor e uma surpresa no confronto final.
 
-Contato
--------
-- Maintainer: caiofreitas23  
-- Para bugs e features: use o sistema de Issues do repositório
+## Tecnologias
 
-Notas finais
-------------
-Este README sintetiza a ideia do projeto e fornece um plano de implementação e avaliação. Ajuste controles, dependências e instruções de compilação conforme a arquitetura final e as bibliotecas escolhidas. Se `codigo_jogo.c` estiver em um subdiretório, atualize os comandos de compilação e o Makefile para apontar para o caminho correto.
+- **Linguagem:** C
+
+## Desenvolvimento
+
+Este projeto está em desenvolvimento. A quantidade de chefes, as habilidades, os itens, os controles e os detalhes da história podem ser ajustados ao longo da criação do jogo.
+
+## Autoria
+
+Projeto desenvolvido para a matéria de PIF da CESAR School.
