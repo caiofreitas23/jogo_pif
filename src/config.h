@@ -1,0 +1,30 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+// TELA
+#define LARGURA_TELA 960
+#define ALTURA_TELA 540
+
+// PLAYER
+#define PLAYER_VIDA 100
+#define PLAYER_VELOCIDADE 5
+#define PLAYER_DANO_BASE 10
+
+// BOSSES 
+#define BOBROVSKY_VIDA 150
+#define BOBROVSKY_DANO 15
+#define BOBROVSKY_VELOCIDADE 3
+
+#define VLADIMIR_VIDA 250
+#define VLADIMIR_DANO 20
+#define VLADIMIR_VELOCIDADE 7
+
+#define IVAN_VIDA 400
+#define IVAN_DANO 40
+#define IVAN_VELOCIDADE 1
+
+#define ANASTASIA_VIDA 700
+#define ANASTASIA_DANO 50 // em andamento: especial que causa 70 de dano
+#define ANASTASIA_VELOCIDADE 4
+
+#endif
