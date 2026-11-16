@@ -19,8 +19,10 @@ void combat_pular(Player *p);
 
 void combat_boss_atacar(Boss *b, Player *p);
 
-
 void combat_executar_acao(Player *p, Boss *b, Acao acao);
+
+void combat_atualizar(Player *p, float tempo);
+
 int combat_verificar_fim(Player *p, Boss *b);
 
 #endif

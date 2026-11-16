@@ -14,4 +14,10 @@ void player_iniciar(Player *p) {
     p->hp = PLAYER_VIDA;
     p->velocidade = PLAYER_VELOCIDADE;
     p->dano = PLAYER_DANO_BASE;
+
+    p->defendendo = 0;
+    p->esquivando = 0;
+
+    p->cooldown_defesa = 0;
+    p->cooldown_esquiva = 0;
 }

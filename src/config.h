@@ -27,7 +27,14 @@
 #define IVAN_VELOCIDADE 1
 
 #define ANASTASIA_VIDA 700
-#define ANASTASIA_DANO 50 // em andamento: especial que causa 70 de dano
+#define ANASTASIA_DANO 50
+#define ANASTASIA_DANO_ESPECIAL 70
 #define ANASTASIA_VELOCIDADE 4
+
+// ESTADO DO COMBATE
+#define COMBATE_EM_ANDAMENTO 0
+#define COMBATE_VITORIA 1
+#define COMBATE_DERROTA -1
+#define COMBATE_EMPATE 2
 
 #endif
