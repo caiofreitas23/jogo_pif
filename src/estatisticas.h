@@ -1,6 +1,6 @@
 #ifndef ESTATISTICAS_H
 #define ESTATISTICAS_H
-
+#define NUM_CHEFES 4
 #include "config.h"
 
 // colunas da matriz
