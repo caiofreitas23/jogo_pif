@@ -8,6 +8,7 @@
 #include "combat.h"
 #include "config.h"
 #include "placar.h"
+#define NUM_CHEFES 4
 #include "estatisticas.h"
 
 typedef enum {

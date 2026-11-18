@@ -1,4 +1,5 @@
 #include "estatisticas.h"
+#define NUM_CHEFES 4
 
 void estat_zerar(Estatisticas *e) {
     int i, j;
