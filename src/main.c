@@ -7,6 +7,7 @@
 #include "boss.h"
 #include "combat.h"
 #include "config.h"
+#include "placar.h"
 
 typedef enum {
     TELA_MENU,
@@ -35,11 +36,37 @@ typedef enum {
     ESQUIVA_DIREITA
 } DirecaoEsquiva;
 
+// Sequência de nocaute: queda -> juiz entra -> contagem -> levanta (ou fim).
+typedef enum {
+    KO_NENHUM,
+    KO_QUEDA,
+    KO_JUIZ_ENTRA,
+    KO_CONTAGEM,
+    KO_LEVANTA,
+    KO_FIM
+} FaseKO;
+
+typedef enum {
+    KO_ALVO_JOGADOR,
+    KO_ALVO_BOSS
+} AlvoKO;
+
 // Opções do menu inicial.
 #define MENU_COMECAR 0
 #define MENU_PLACAR 1
 #define MENU_SAIR 2
 #define MENU_TOTAL 3
+
+// Tudo que a tela de nome e a tela de placar precisam.
+typedef struct {
+    Placar placar;
+    int destaque;            // linha do recorde recém-inserido (-1 = nenhuma)
+    int pontos_fora;         // pontuação que não entrou no placar (-1 = nenhuma)
+    int opcao;               // 0 = VOLTAR, 1 = APAGAR RECORDES
+    int confirmar_apagar;    // 1 = próximo clique/ENTER apaga de verdade
+    char nome[PLACAR_TAM_NOME + 1];
+    int tam_nome;
+} EstadoPlacar;
 
 static void iniciar_boss(Boss *boss, int numero_boss) {
     switch (numero_boss) {
@@ -76,6 +103,10 @@ static void desenhar_texto_centralizado(const char *texto, int y, int tamanho, C
     DrawText(texto, (LARGURA_TELA - largura) / 2, y, tamanho, cor);
 }
 
+/*
+ * Desenha o jogador em primeiro plano, visto por trás.
+ * O deslocamento horizontal representa a esquiva.
+ */
 static void desenhar_jogador_de_costas(
     int centro_x,
     int topo_y,
@@ -490,6 +521,73 @@ static void desenhar_estrelas(float cx, float cy, float raio) {
             cy - raio * 0.8f + sinf(a) * raio * 0.35f
         };
         DrawPoly(centro, 4, raio * 0.16f + 3.0f, t * 120.0f, (Color){255, 220, 60, 255});
+    }
+}
+
+// Ângulo (0 a 90) da queda, conforme a fase do nocaute.
+static float angulo_nocaute(FaseKO fase, float tempo_ko) {
+    float u;
+
+    switch (fase) {
+        case KO_QUEDA:
+            u = tempo_ko / NOCAUTE_DURACAO_QUEDA;
+            if (u > 1.0f) u = 1.0f;
+            return 90.0f * u * u;
+        case KO_LEVANTA:
+            u = tempo_ko / NOCAUTE_DURACAO_LEVANTAR;
+            if (u > 1.0f) u = 1.0f;
+            return 90.0f * (1.0f - u);
+        case KO_NENHUM:
+            return 0.0f;
+        default:
+            return 90.0f;
+    }
+}
+
+// Juiz e contagem acima da cabeça dele (jogador: tamanho grande; chefe: pequeno ao fundo).
+static void desenhar_juiz_nocaute(AlvoKO alvo, FaseKO fase, float tempo_ko) {
+    int alvo_boss = (alvo == KO_ALVO_BOSS);
+    float escala = alvo_boss ? 0.55f : 1.0f;
+    float x_final = alvo_boss ? 600.0f : 660.0f;
+    float y_pe = alvo_boss ? 318.0f : 515.0f;
+    float x = x_final;
+    float ritmo = 0.0f;
+    int braco = 0;
+
+    if (fase == KO_QUEDA || fase == KO_NENHUM) {
+        return;
+    }
+
+    if (fase == KO_JUIZ_ENTRA) {
+        float u = tempo_ko / NOCAUTE_DURACAO_JUIZ;
+        float inicio = (float)LARGURA_TELA + 60.0f;
+
+        if (u > 1.0f) u = 1.0f;
+        u = 1.0f - (1.0f - u) * (1.0f - u);
+        x = inicio + (x_final - inicio) * u;
+        ritmo = (float)GetTime();
+    }
+
+    if (fase == KO_CONTAGEM) {
+        braco = (tempo_ko - (int)tempo_ko) < 0.5f;
+    }
+
+    desenhar_juiz(x, y_pe, escala, ritmo, braco);
+
+    if (fase == KO_CONTAGEM) {
+        int limite = alvo_boss ? NOCAUTE_CONTAGEM_BOSS : NOCAUTE_CONTAGEM_JOGADOR;
+        int n = (int)tempo_ko + 1;
+        int tamanho = alvo_boss ? 44 : 64;
+        int y_texto = (int)(y_pe - 160.0f * escala) - tamanho - 12;
+        const char *texto;
+        int largura;
+
+        if (n > limite) n = limite;
+        texto = TextFormat("%d", n);
+        largura = MeasureText(texto, tamanho);
+
+        DrawText(texto, (int)x - largura / 2 + 2, y_texto + 2, tamanho, BLACK);
+        DrawText(texto, (int)x - largura / 2, y_texto, tamanho, (Color){255, 205, 55, 255});
     }
 }
 
