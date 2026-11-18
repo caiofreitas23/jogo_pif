@@ -8,6 +8,7 @@
 #include "combat.h"
 #include "config.h"
 #include "placar.h"
+#include "estatisticas.h"
 
 typedef enum {
     TELA_MENU,
@@ -653,15 +654,43 @@ static void desenhar_menu(int opcao) {
     );
 }
 
-static void desenhar_game_over(int pontuacao) {
+// Tabela da matriz de estatísticas: uma linha por chefe.
+static void desenhar_resumo(const Estatisticas *est, int y) {
+    static const char *nomes[NUM_CHEFES] = {"Bobrovsky", "Vladimir", "Ivan", "Anastasia"};
+    Color cinza = (Color){190, 195, 205, 255};
+    Color apagado = (Color){100, 105, 115, 255};
+    int i;
+
+    DrawText("CHEFE", 150, y, 18, cinza);
+    DrawText("SOCOS", 330, y, 18, cinza);
+    DrawText("CONTRA-ATAQUES", 430, y, 18, cinza);
+    DrawText("ESQUIVAS", 640, y, 18, cinza);
+    DrawText("PONTOS", 770, y, 18, cinza);
+    DrawLine(140, y + 24, 840, y + 24, apagado);
+
+    for (i = 0; i < NUM_CHEFES; i++) {
+        int linha_y = y + 32 + i * 26;
+        int pontos = estat_pontos_chefe(est, i + 1);
+        Color cor = (pontos > 0) ? RAYWHITE : apagado;
+
+        DrawText(nomes[i], 150, linha_y, 20, cor);
+        DrawText(TextFormat("%d", est->dados[i][STAT_SOCOS]), 330, linha_y, 20, cor);
+        DrawText(TextFormat("%d", est->dados[i][STAT_CONTRA_ATAQUES]), 430, linha_y, 20, cor);
+        DrawText(TextFormat("%d", est->dados[i][STAT_ESQUIVAS]), 640, linha_y, 20, cor);
+        DrawText(TextFormat("%d", pontos), 770, linha_y, 20, cor);
+    }
+}
+
+static void desenhar_game_over(int pontuacao, const Estatisticas *est) {
     ClearBackground((Color){22, 24, 29, 255});
 
-    desenhar_texto_centralizado("GAME OVER", 150, 64, RED);
-    desenhar_texto_centralizado("Você perdeu todos os continues.", 250, 24, RAYWHITE);
+    desenhar_texto_centralizado("GAME OVER", 35, 64, RED);
+    desenhar_texto_centralizado("Você perdeu todos os continues.", 112, 22, RAYWHITE);
     desenhar_texto_centralizado(
-        TextFormat("PONTUAÇÃO: %d", pontuacao), 295, 30, (Color){255, 205, 55, 255}
+        TextFormat("PONTUAÇÃO: %d", pontuacao), 150, 30, (Color){255, 205, 55, 255}
     );
-    desenhar_texto_centralizado("ENTER: REGISTRAR PONTUAÇÃO", 360, 22, RAYWHITE);
+    desenhar_resumo(est, 215);
+    desenhar_texto_centralizado("ENTER: REGISTRAR PONTUAÇÃO", 440, 22, RAYWHITE);
 }
 
 static void abrir_placar(EstadoPlacar *ep) {
@@ -734,8 +763,9 @@ static void desenhar_placar(const EstadoPlacar *ep) {
         desenhar_texto_centralizado("Nenhum recorde ainda.", 250, 24, cinza);
     }
 
-    for (i = 0; i < ep->placar.quantidade; i++) {
-        const Registro *r = &ep->placar.itens[i];
+    i = 0;
+    for (const NoPlacar *no = ep->placar.inicio; no != NULL; no = no->proximo, i++) {
+        const Registro *r = &no->registro;
         int y = 134 + i * 28;
         Color cor = (i == ep->destaque) ? dourado : RAYWHITE;
 
@@ -905,12 +935,18 @@ int main(void) {
     int ko_definitivo = 0;          // 1 = não haverá contagem nem reviver
     float tempo_ko = 0;
 
-    // Pontuação e placar.
+    // Pontuação (calculada a partir da matriz de estatísticas) e placar.
+    Estatisticas estatisticas;
+    Estatisticas *est = &estatisticas;
     int pontuacao = 0;
+
+    estat_zerar(est);
+
     Registro novo_registro = {{0}, 0, 1, 1, 2026, 0, 0};
     EstadoPlacar ep;
 
     memset(&ep, 0, sizeof(ep));
+    placar_iniciar(&ep.placar);
     ep.destaque = -1;
     ep.pontos_fora = -1;
 
@@ -933,6 +969,7 @@ int main(void) {
                     continues = CONTINUES_INICIAIS;
                     revivido = 0;
                     boss_reviveu = 0;
+                    estat_zerar(est);
                     pontuacao = 0;
                     fase_ko = KO_NENHUM;
                     tempo_transicao = TEMPO_TRANSICAO;
@@ -1088,7 +1125,9 @@ int main(void) {
                 jogador.dano = dano_original;
 
                 // Recompensa por bater.
-                pontuacao += contra_ataque ? PONTOS_SOCO_CONTRA_ATAQUE : PONTOS_SOCO;
+                estat_registrar(est, numero_boss,
+                                contra_ataque ? STAT_CONTRA_ATAQUES : STAT_SOCOS);
+                pontuacao = estat_pontuacao(est);
             }
 
             if (IsKeyPressed(KEY_S)) {
@@ -1140,7 +1179,8 @@ int main(void) {
                             tempo_contra_ataque = 0.8f;
 
                             // Recompensa por desviar.
-                            pontuacao += PONTOS_ESQUIVA;
+                            estat_registrar(est, numero_boss, STAT_ESQUIVAS);
+                            pontuacao = estat_pontuacao(est);
                         } else {
                             jogador.esquivando = 0;
 
@@ -1564,15 +1604,14 @@ int main(void) {
                 );
                 desenhar_texto_centralizado("ENTER: PRÓXIMO COMBATE", 285, 22, RAYWHITE);
             } else if (resultado == COMBATE_VITORIA) {
+                desenhar_texto_centralizado("CAMPEÃO", 40, 52, (Color){255, 205, 55, 255});
+                desenhar_texto_centralizado("VOCÊ VENCEU A CAMPANHA", 105, 24, RAYWHITE);
                 desenhar_texto_centralizado(
-                    "CAMPEÃO", 170, 52, (Color){255, 205, 55, 255}
-                );
-                desenhar_texto_centralizado("VOCÊ VENCEU A CAMPANHA", 255, 24, RAYWHITE);
-                desenhar_texto_centralizado(
-                    TextFormat("PONTUAÇÃO: %d", pontuacao), 298, 30,
+                    TextFormat("PONTUAÇÃO: %d", pontuacao), 145, 30,
                     (Color){255, 205, 55, 255}
                 );
-                desenhar_texto_centralizado("ENTER: REGISTRAR PONTUAÇÃO", 360, 22, RAYWHITE);
+                desenhar_resumo(est, 205);
+                desenhar_texto_centralizado("ENTER: REGISTRAR PONTUAÇÃO", 440, 22, RAYWHITE);
             } else {
                 desenhar_texto_centralizado("DERROTA", 150, 52, RED);
                 desenhar_texto_centralizado(
@@ -1592,7 +1631,7 @@ int main(void) {
                 );
             }
         } else if (tela == TELA_GAME_OVER) {
-            desenhar_game_over(pontuacao);
+            desenhar_game_over(pontuacao, est);
         } else if (tela == TELA_NOME) {
             desenhar_tela_nome(&ep, &novo_registro);
         } else if (tela == TELA_PLACAR) {
@@ -1601,6 +1640,9 @@ int main(void) {
 
         EndDrawing();
     }
+
+    // libera os nos da lista do placar
+    placar_liberar(&ep.placar);
 
     CloseWindow();
     return 0;
