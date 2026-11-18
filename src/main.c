@@ -1,12 +1,21 @@
 #include "raylib.h"
+#include "rlgl.h"
+#include <ctype.h>
+#include <math.h>
+#include <string.h>
 #include "player.h"
 #include "boss.h"
 #include "combat.h"
 #include "config.h"
 
 typedef enum {
+    TELA_MENU,
+    TELA_TRANSICAO,
     TELA_COMBATE,
-    TELA_FINAL
+    TELA_FINAL,
+    TELA_GAME_OVER,
+    TELA_NOME,
+    TELA_PLACAR
 } Tela;
 
 typedef enum {
@@ -25,6 +34,12 @@ typedef enum {
     ESQUIVA_ESQUERDA,
     ESQUIVA_DIREITA
 } DirecaoEsquiva;
+
+// Opções do menu inicial.
+#define MENU_COMECAR 0
+#define MENU_PLACAR 1
+#define MENU_SAIR 2
+#define MENU_TOTAL 3
 
 static void iniciar_boss(Boss *boss, int numero_boss) {
     switch (numero_boss) {
@@ -56,10 +71,11 @@ static int obter_vida_maxima_boss(int numero_boss) {
     }
 }
 
-/*
- * Desenha o jogador em primeiro plano, visto por trás.
- * O deslocamento horizontal representa a esquiva.
- */
+static void desenhar_texto_centralizado(const char *texto, int y, int tamanho, Color cor) {
+    int largura = MeasureText(texto, tamanho);
+    DrawText(texto, (LARGURA_TELA - largura) / 2, y, tamanho, cor);
+}
+
 static void desenhar_jogador_de_costas(
     int centro_x,
     int topo_y,
@@ -164,7 +180,8 @@ static void desenhar_boss_de_frente(
     Color roupa,
     Color pele,
     int atacando,
-    int defendendo
+    int defendendo,
+    int lado_ataque
 ) {
     int x = centro_x;
     int y = topo_y;
@@ -206,20 +223,21 @@ static void desenhar_boss_de_frente(
         DrawCircle(x + 18, y + 38, 12, luva);
     } else if (atacando) {
         // Braço avançado na preparação do golpe.
+        // lado_ataque: -1 = golpe pela esquerda da tela, +1 = pela direita.
         DrawLineEx(
-            (Vector2){(float)(x + 27), (float)(y + 59)},
-            (Vector2){(float)(x + 62), (float)(y + 68)},
+            (Vector2){(float)(x + lado_ataque * 27), (float)(y + 59)},
+            (Vector2){(float)(x + lado_ataque * 62), (float)(y + 68)},
             16,
             pele
         );
-        DrawCircle(x + 68, y + 68, 13, luva);
+        DrawCircle(x + lado_ataque * 68, y + 68, 13, luva);
         DrawLineEx(
-            (Vector2){(float)(x - 28), (float)(y + 62)},
-            (Vector2){(float)(x - 38), (float)(y + 82)},
+            (Vector2){(float)(x - lado_ataque * 28), (float)(y + 62)},
+            (Vector2){(float)(x - lado_ataque * 38), (float)(y + 82)},
             14,
             pele
         );
-        DrawCircle(x - 41, y + 86, 12, luva);
+        DrawCircle(x - lado_ataque * 41, y + 86, 12, luva);
     } else {
         // Guarda neutra.
         DrawLineEx(
@@ -298,6 +316,183 @@ static void desenhar_arena(void) {
     );
 }
 
+
+static unsigned char clarear_canal(unsigned char v) {
+    int r = v + 45;
+    return (unsigned char)(r > 255 ? 255 : r);
+}
+
+// Três garras apontadas para baixo, a partir do centro da pata.
+static void desenhar_garras(int px, int py) {
+    Color garra = (Color){235, 230, 215, 255};
+    int k;
+
+    for (k = -1; k <= 1; k++) {
+        DrawLineEx(
+            (Vector2){(float)(px + k * 7), (float)(py + 7)},
+            (Vector2){(float)(px + k * 9), (float)(py + 21)},
+            3, garra
+        );
+    }
+}
+
+/*
+ * Anastasia: uma ursa de pé, vista de frente, no mesmo ponto de vista dos
+ * outros chefes. Mesma lógica de poses: guarda, preparando golpe e defesa.
+ */
+static void desenhar_urso_de_frente(
+    int centro_x,
+    int topo_y,
+    Color pelo,
+    int atacando,
+    int defendendo,
+    int lado_ataque
+) {
+    int x = centro_x;
+    int y = topo_y;
+
+    Color escuro = (Color){
+        (unsigned char)(pelo.r * 0.7f),
+        (unsigned char)(pelo.g * 0.7f),
+        (unsigned char)(pelo.b * 0.7f),
+        255
+    };
+    Color claro = (Color){
+        clarear_canal(pelo.r), clarear_canal(pelo.g), clarear_canal(pelo.b), 255
+    };
+    Color focinho = (Color){201, 165, 125, 255};
+    Color almofada = (Color){70, 40, 40, 255};
+
+    // Patas traseiras.
+    DrawEllipse(x - 30, y + 158, 26, 15, escuro);
+    DrawEllipse(x + 30, y + 158, 26, 15, escuro);
+    DrawEllipse(x - 30, y + 162, 13, 7, almofada);
+    DrawEllipse(x + 30, y + 162, 13, 7, almofada);
+
+    // Corpo e barriga.
+    DrawEllipse(x, y + 105, 58, 64, pelo);
+    DrawEllipse(x, y + 114, 35, 44, claro);
+
+    // Braços e patas dianteiras.
+    if (defendendo) {
+        DrawLineEx((Vector2){(float)(x - 48), (float)(y + 80)},
+                   (Vector2){(float)(x - 26), (float)(y + 54)}, 26, pelo);
+        DrawLineEx((Vector2){(float)(x + 48), (float)(y + 80)},
+                   (Vector2){(float)(x + 26), (float)(y + 54)}, 26, pelo);
+        DrawCircle(x - 24, y + 50, 16, escuro);
+        DrawCircle(x + 24, y + 50, 16, escuro);
+        desenhar_garras(x - 24, y + 50);
+        desenhar_garras(x + 24, y + 50);
+    } else if (atacando) {
+        // lado_ataque: -1 = golpe pela esquerda da tela, +1 = pela direita.
+        DrawLineEx((Vector2){(float)(x + lado_ataque * 46), (float)(y + 76)},
+                   (Vector2){(float)(x + lado_ataque * 92), (float)(y + 52)}, 26, pelo);
+        DrawCircle(x + lado_ataque * 97, y + 49, 17, escuro);
+        desenhar_garras(x + lado_ataque * 97, y + 49);
+
+        DrawLineEx((Vector2){(float)(x - lado_ataque * 46), (float)(y + 80)},
+                   (Vector2){(float)(x - lado_ataque * 60), (float)(y + 120)}, 24, pelo);
+        DrawCircle(x - lado_ataque * 62, y + 125, 15, escuro);
+        desenhar_garras(x - lado_ataque * 62, y + 125);
+    } else {
+        DrawLineEx((Vector2){(float)(x - 50), (float)(y + 78)},
+                   (Vector2){(float)(x - 67), (float)(y + 124)}, 25, pelo);
+        DrawLineEx((Vector2){(float)(x + 50), (float)(y + 78)},
+                   (Vector2){(float)(x + 67), (float)(y + 124)}, 25, pelo);
+        DrawCircle(x - 69, y + 129, 15, escuro);
+        DrawCircle(x + 69, y + 129, 15, escuro);
+        desenhar_garras(x - 69, y + 129);
+        desenhar_garras(x + 69, y + 129);
+    }
+
+    // Orelhas, cabeça e focinho.
+    DrawCircle(x - 25, y + 15, 12, pelo);
+    DrawCircle(x + 25, y + 15, 12, pelo);
+    DrawCircle(x - 25, y + 15, 6, almofada);
+    DrawCircle(x + 25, y + 15, 6, almofada);
+
+    DrawCircle(x, y + 40, 32, pelo);
+    DrawEllipse(x, y + 52, 16, 12, focinho);
+    DrawEllipse(x, y + 47, 6, 4, BLACK);
+    DrawLineEx((Vector2){(float)x, (float)(y + 51)},
+               (Vector2){(float)x, (float)(y + 58)}, 2, BLACK);
+    DrawLineEx((Vector2){(float)(x - 7), (float)(y + 60)},
+               (Vector2){(float)x, (float)(y + 58)}, 2, BLACK);
+    DrawLineEx((Vector2){(float)(x + 7), (float)(y + 60)},
+               (Vector2){(float)x, (float)(y + 58)}, 2, BLACK);
+
+    // Olhos com sobrancelhas franzidas.
+    DrawCircle(x - 12, y + 35, 3, BLACK);
+    DrawCircle(x + 12, y + 35, 3, BLACK);
+    DrawLineEx((Vector2){(float)(x - 19), (float)(y + 27)},
+               (Vector2){(float)(x - 7), (float)(y + 31)}, 3, escuro);
+    DrawLineEx((Vector2){(float)(x + 19), (float)(y + 27)},
+               (Vector2){(float)(x + 7), (float)(y + 31)}, 3, escuro);
+}
+
+/*
+ * Juiz de camisa listrada. (x, y_pe) é o ponto dos pés; "ritmo" balança as
+ * pernas enquanto ele anda (0 = parado); braco_levantado marca a contagem.
+ */
+static void desenhar_juiz(float x, float y_pe, float escala, float ritmo, int braco_levantado) {
+    Color camisa = (Color){236, 236, 236, 255};
+    Color listra = (Color){22, 22, 26, 255};
+    Color calca = (Color){26, 26, 32, 255};
+    Color pele = (Color){218, 178, 132, 255};
+    int passo = (ritmo > 0) ? (int)(sinf(ritmo * 14.0f) * 6.0f) : 0;
+    int k;
+
+    rlPushMatrix();
+    rlTranslatef(x, y_pe, 0.0f);
+    rlScalef(escala, escala, 1.0f);
+
+    // Pernas e sapatos.
+    DrawRectangle(-16 + passo, -60, 13, 60, calca);
+    DrawRectangle(3 - passo, -60, 13, 60, calca);
+    DrawRectangle(-19 + passo, -8, 19, 8, BLACK);
+    DrawRectangle(1 - passo, -8, 19, 8, BLACK);
+
+    // Tronco listrado.
+    DrawRectangle(-26, -124, 52, 66, camisa);
+    for (k = 0; k < 5; k++) {
+        DrawRectangle(-22 + k * 10, -124, 4, 66, listra);
+    }
+
+    // Braços: o direito marca a contagem.
+    DrawLineEx((Vector2){-26.0f, -116.0f}, (Vector2){-35.0f, -70.0f}, 12, camisa);
+    DrawCircle(-36, -66, 7, pele);
+
+    if (braco_levantado) {
+        DrawLineEx((Vector2){26.0f, -116.0f}, (Vector2){46.0f, -170.0f}, 12, camisa);
+        DrawCircle(47, -175, 8, pele);
+    } else {
+        DrawLineEx((Vector2){26.0f, -116.0f}, (Vector2){50.0f, -128.0f}, 12, camisa);
+        DrawCircle(53, -130, 8, pele);
+    }
+
+    // Cabeça, cabelo e gravata-borboleta.
+    DrawCircle(0, -142, 18, pele);
+    DrawRectangle(-18, -160, 36, 9, (Color){40, 30, 24, 255});
+    DrawRectangle(-9, -124, 18, 6, (Color){190, 35, 35, 255});
+
+    rlPopMatrix();
+}
+
+// Pequenas estrelas girando sobre a cabeça de quem foi nocauteado.
+static void desenhar_estrelas(float cx, float cy, float raio) {
+    float t = (float)GetTime();
+    int i;
+
+    for (i = 0; i < 3; i++) {
+        float a = t * 4.0f + i * 2.094f;
+        Vector2 centro = {
+            cx + cosf(a) * raio,
+            cy - raio * 0.8f + sinf(a) * raio * 0.35f
+        };
+        DrawPoly(centro, 4, raio * 0.16f + 3.0f, t * 120.0f, (Color){255, 220, 60, 255});
+    }
+}
+
 static void reiniciar_combate(
     Player *jogador,
     Boss *boss,
@@ -334,16 +529,247 @@ static void reiniciar_combate(
     *resultado = COMBATE_EM_ANDAMENTO;
 }
 
+
+static void desenhar_menu(int opcao) {
+    Color normal = (Color){190, 195, 205, 255};
+    Color destaque = (Color){255, 205, 55, 255};
+    const char *rotulos[MENU_TOTAL] = {"COMEÇAR", "PLACAR", "SAIR"};
+    int i;
+
+    desenhar_arena();
+    DrawRectangle(0, 0, LARGURA_TELA, ALTURA_TELA, (Color){0, 0, 0, 170});
+
+    desenhar_texto_centralizado("BEYOND THE FALLEN", 110, 64, RAYWHITE);
+    desenhar_texto_centralizado("Sobreviva ao gulag. Derrube os chefes.", 195, 22, normal);
+
+    for (i = 0; i < MENU_TOTAL; i++) {
+        desenhar_texto_centralizado(
+            i == opcao ? TextFormat("> %s <", rotulos[i]) : rotulos[i],
+            265 + i * 55, 34, i == opcao ? destaque : normal
+        );
+    }
+
+    desenhar_texto_centralizado("W/S ou SETAS: escolher    ENTER: confirmar", 460, 18, normal);
+    desenhar_texto_centralizado(
+        "Projeto de PIF - CESAR School", 500, 16, (Color){120, 125, 135, 255}
+    );
+}
+
+static void desenhar_game_over(int pontuacao) {
+    ClearBackground((Color){22, 24, 29, 255});
+
+    desenhar_texto_centralizado("GAME OVER", 150, 64, RED);
+    desenhar_texto_centralizado("Você perdeu todos os continues.", 250, 24, RAYWHITE);
+    desenhar_texto_centralizado(
+        TextFormat("PONTUAÇÃO: %d", pontuacao), 295, 30, (Color){255, 205, 55, 255}
+    );
+    desenhar_texto_centralizado("ENTER: REGISTRAR PONTUAÇÃO", 360, 22, RAYWHITE);
+}
+
+static void abrir_placar(EstadoPlacar *ep) {
+    placar_carregar(&ep->placar);
+    ep->destaque = -1;
+    ep->pontos_fora = -1;
+    ep->opcao = 0;
+    ep->confirmar_apagar = 0;
+}
+
+// Fim de partida: pede o nome se a pontuação entra no placar; senão, mostra o placar.
+static Tela abrir_fim_de_partida(EstadoPlacar *ep, int pontos) {
+    abrir_placar(ep);
+    ep->nome[0] = '\0';
+    ep->tam_nome = 0;
+
+    if (placar_qualifica(&ep->placar, pontos)) {
+        // Descarta teclas digitadas nas telas anteriores (ex.: o "G" de desistir).
+        while (GetCharPressed() > 0) {
+        }
+        return TELA_NOME;
+    }
+
+    ep->pontos_fora = pontos;
+    return TELA_PLACAR;
+}
+
+static Rectangle retangulo_botao_placar(int indice) {
+    if (indice == 0) {
+        return (Rectangle){190, 462, 220, 46};
+    }
+
+    return (Rectangle){430, 462, 340, 46};
+}
+
+static void desenhar_botao(Rectangle r, const char *texto, int selecionado) {
+    Color dourado = (Color){255, 205, 55, 255};
+    int largura = MeasureText(texto, 22);
+
+    DrawRectangleRec(
+        r, selecionado ? (Color){70, 58, 20, 235} : (Color){30, 32, 38, 235}
+    );
+    DrawRectangleLinesEx(r, 2, selecionado ? dourado : (Color){110, 115, 125, 255});
+    DrawText(
+        texto,
+        (int)(r.x + (r.width - largura) / 2),
+        (int)(r.y + (r.height - 22) / 2),
+        22,
+        selecionado ? dourado : (Color){190, 195, 205, 255}
+    );
+}
+
+static void desenhar_placar(const EstadoPlacar *ep) {
+    Color cinza = (Color){190, 195, 205, 255};
+    Color dourado = (Color){255, 205, 55, 255};
+    int i;
+
+    desenhar_arena();
+    DrawRectangle(0, 0, LARGURA_TELA, ALTURA_TELA, (Color){0, 0, 0, 205});
+
+    desenhar_texto_centralizado("PLACAR", 24, 48, RAYWHITE);
+
+    DrawText("POS", 140, 100, 18, cinza);
+    DrawText("NOME", 230, 100, 18, cinza);
+    DrawText("PONTOS", 340, 100, 18, cinza);
+    DrawText("DATA E HORA", 520, 100, 18, cinza);
+    DrawLine(120, 124, 840, 124, (Color){110, 115, 125, 255});
+
+    if (ep->placar.quantidade == 0) {
+        desenhar_texto_centralizado("Nenhum recorde ainda.", 250, 24, cinza);
+    }
+
+    for (i = 0; i < ep->placar.quantidade; i++) {
+        const Registro *r = &ep->placar.itens[i];
+        int y = 134 + i * 28;
+        Color cor = (i == ep->destaque) ? dourado : RAYWHITE;
+
+        if (i == ep->destaque) {
+            DrawRectangle(120, y - 4, 720, 28, (Color){255, 205, 55, 45});
+        }
+
+        DrawText(TextFormat("%2d.", i + 1), 140, y, 20, cor);
+        DrawText(r->nome, 230, y, 20, cor);
+        DrawText(TextFormat("%d", r->pontos), 340, y, 20, cor);
+        DrawText(
+            TextFormat("%02d/%02d/%04d  %02d:%02d",
+                       r->dia, r->mes, r->ano, r->hora, r->minuto),
+            520, y, 20, cor
+        );
+    }
+
+    if (ep->pontos_fora >= 0) {
+        desenhar_texto_centralizado(
+            TextFormat("Sua pontuação (%d) não entrou no top %d.",
+                       ep->pontos_fora, PLACAR_MAX_REGISTROS),
+            424, 18, cinza
+        );
+    }
+
+    desenhar_botao(retangulo_botao_placar(0), "VOLTAR", ep->opcao == 0);
+    desenhar_botao(
+        retangulo_botao_placar(1),
+        ep->confirmar_apagar ? "CONFIRMAR: APAGAR TUDO" : "APAGAR RECORDES",
+        ep->opcao == 1
+    );
+
+    desenhar_texto_centralizado(
+        "A/D ou SETAS: escolher    ENTER ou mouse: confirmar",
+        516, 14, (Color){120, 125, 135, 255}
+    );
+}
+
+static void desenhar_tela_nome(const EstadoPlacar *ep, const Registro *r) {
+    Color cinza = (Color){190, 195, 205, 255};
+    Color dourado = (Color){255, 205, 55, 255};
+    int i;
+    int largura_caixa = 70;
+    int espaco = 20;
+    int x0 = (LARGURA_TELA - (3 * largura_caixa + 2 * espaco)) / 2;
+
+    ClearBackground((Color){22, 24, 29, 255});
+
+    desenhar_texto_centralizado("NOVO RECORDE!", 55, 52, dourado);
+    desenhar_texto_centralizado(TextFormat("PONTUAÇÃO: %d", r->pontos), 135, 32, RAYWHITE);
+    desenhar_texto_centralizado(
+        TextFormat("Partida encerrada em %02d/%02d/%04d às %02d:%02d",
+                   r->dia, r->mes, r->ano, r->hora, r->minuto),
+        185, 20, cinza
+    );
+    desenhar_texto_centralizado("DIGITE 3 LETRAS PARA O PLACAR", 250, 22, RAYWHITE);
+
+    for (i = 0; i < PLACAR_TAM_NOME; i++) {
+        Rectangle caixa = {(float)(x0 + i * (largura_caixa + espaco)), 295, (float)largura_caixa, 90};
+        int ativa = (i == ep->tam_nome);
+
+        DrawRectangleRec(caixa, (Color){30, 32, 38, 255});
+        DrawRectangleLinesEx(caixa, 3, ativa ? dourado : (Color){110, 115, 125, 255});
+
+        if (i < ep->tam_nome) {
+            char letra[2] = {ep->nome[i], '\0'};
+            int w = MeasureText(letra, 60);
+            DrawText(letra, (int)(caixa.x + (caixa.width - w) / 2), 310, 60, RAYWHITE);
+        } else if (ativa && ((int)(GetTime() * 2.0) % 2 == 0)) {
+            DrawRectangle((int)caixa.x + 15, 360, 40, 5, dourado);
+        }
+    }
+
+    desenhar_texto_centralizado(
+        ep->tam_nome == PLACAR_TAM_NOME ? "ENTER: CONFIRMAR" : "Faltam letras para confirmar",
+        425, 22, ep->tam_nome == PLACAR_TAM_NOME ? dourado : cinza
+    );
+    desenhar_texto_centralizado("BACKSPACE: apagar a última letra", 465, 18, cinza);
+}
+
+/*
+ * Transição entre o menu e a primeira luta: contagem regressiva de
+ * TEMPO_TRANSICAO segundos, com fade-in no início e fade-out no final.
+ */
+static void desenhar_transicao(float restante) {
+    Color cinza = (Color){190, 195, 205, 255};
+    Color dourado = (Color){255, 205, 55, 255};
+
+    float decorrido = TEMPO_TRANSICAO - restante;
+    float alfa = 1.0f;
+
+    if (decorrido < 1.0f) alfa = decorrido;
+    if (restante < alfa) alfa = restante;
+    if (alfa < 0.0f) alfa = 0.0f;
+    if (alfa > 1.0f) alfa = 1.0f;
+
+    int segundos = (int)restante;
+    if (restante > (float)segundos) segundos++;
+
+    ClearBackground((Color){12, 13, 16, 255});
+
+    desenhar_texto_centralizado("PREPARE-SE", 60, 40, Fade(RAYWHITE, alfa));
+    desenhar_texto_centralizado("A LUTA COMEÇA EM", 125, 24, Fade(cinza, alfa));
+    desenhar_texto_centralizado(TextFormat("%d", segundos), 165, 110, Fade(dourado, alfa));
+
+    // Barra de progresso da contagem.
+    int largura_barra = 400;
+    int barra_x = (LARGURA_TELA - largura_barra) / 2;
+    DrawRectangle(barra_x, 310, largura_barra, 10, Fade(DARKGRAY, alfa));
+    DrawRectangle(
+        barra_x, 310,
+        (int)(largura_barra * decorrido / TEMPO_TRANSICAO),
+        10,
+        Fade(dourado, alfa)
+    );
+
+    desenhar_texto_centralizado("A / D : ESQUIVAR para o lado OPOSTO ao braço do chefe", 365, 20, Fade(cinza, alfa));
+    desenhar_texto_centralizado("S : DEFENDER (reduz o dano pela metade)", 400, 20, Fade(cinza, alfa));
+    desenhar_texto_centralizado("J / K : SOCO (quando o chefe estiver se recuperando)", 435, 20, Fade(cinza, alfa));
+}
+
+
 int main(void) {
     Player jogador;
-    Boss boss;
+    Boss boss = {0};
 
     player_iniciar(&jogador);
 
     InitWindow(LARGURA_TELA, ALTURA_TELA, "Beyond the Fallen");
     SetTargetFPS(60);
 
-    Tela tela = TELA_COMBATE;
+    Tela tela = TELA_MENU;
     EstadoBoss estado_boss = BOSS_GUARDANDO;
 
     DirecaoAtaque direcao_ataque = ATAQUE_ESQUERDA;
@@ -366,31 +792,154 @@ int main(void) {
     int soco_esquerdo = 0;
     int soco_direito = 0;
 
-    reiniciar_combate(
-        &jogador,
-        &boss,
-        numero_boss,
-        &estado_boss,
-        &tempo_estado,
-        &tempo_soco,
-        &tempo_recuperacao_soco,
-        &tempo_contra_ataque,
-        &quantidade_ataques,
-        &soco_esquerdo,
-        &soco_direito,
-        &esquiva_perfeita,
-        &resultado
-    );
+    // Menu, transição e sistema de continues.
+    int opcao_menu = MENU_COMECAR;
+    int sair_do_jogo = 0;
+    int iniciar_combate = 0;        // pede para (re)começar a luta atual
+    int revivido = 0;               // jogador já usou o "reviver" nesta luta?
+    int boss_reviveu = 0;           // chefe já usou o "reviver" nesta luta?
+    int continues = CONTINUES_INICIAIS;
+    float tempo_transicao = TEMPO_TRANSICAO;
 
-    intervalo_ataque = 2.8f - boss.velocidade * 0.15f;
-    if (intervalo_ataque < 1.4f) {
-        intervalo_ataque = 1.4f;
-    }
+    // Nocaute (vale para o jogador e para os chefes).
+    FaseKO fase_ko = KO_NENHUM;
+    AlvoKO alvo_ko = KO_ALVO_JOGADOR;
+    int ko_definitivo = 0;          // 1 = não haverá contagem nem reviver
+    float tempo_ko = 0;
 
-    while (!WindowShouldClose()) {
+    // Pontuação e placar.
+    int pontuacao = 0;
+    Registro novo_registro = {{0}, 0, 1, 1, 2026, 0, 0};
+    EstadoPlacar ep;
+
+    memset(&ep, 0, sizeof(ep));
+    ep.destaque = -1;
+    ep.pontos_fora = -1;
+
+    while (!WindowShouldClose() && !sair_do_jogo) {
         float tempo = GetFrameTime();
 
-        if (tela == TELA_COMBATE) {
+        if (tela == TELA_MENU) {
+            if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
+                opcao_menu = (opcao_menu + MENU_TOTAL - 1) % MENU_TOTAL;
+            }
+
+            if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+                opcao_menu = (opcao_menu + 1) % MENU_TOTAL;
+            }
+
+            if (IsKeyPressed(KEY_ENTER)) {
+                if (opcao_menu == MENU_COMECAR) {
+                    // Novo jogo: sempre recomeça do primeiro chefe.
+                    numero_boss = 1;
+                    continues = CONTINUES_INICIAIS;
+                    revivido = 0;
+                    boss_reviveu = 0;
+                    pontuacao = 0;
+                    fase_ko = KO_NENHUM;
+                    tempo_transicao = TEMPO_TRANSICAO;
+                    tela = TELA_TRANSICAO;
+                } else if (opcao_menu == MENU_PLACAR) {
+                    abrir_placar(&ep);
+                    tela = TELA_PLACAR;
+                } else {
+                    sair_do_jogo = 1;
+                }
+            }
+        } else if (tela == TELA_TRANSICAO) {
+            tempo_transicao -= tempo;
+
+            if (tempo_transicao <= 0) {
+                tempo_transicao = 0;
+                iniciar_combate = 1;
+            }
+        } else if (tela == TELA_COMBATE && fase_ko != KO_NENHUM) {
+            // ---------- Sequência de nocaute ----------
+            int encerrar_luta = 0;
+
+            tempo_ko += tempo;
+
+            switch (fase_ko) {
+                case KO_QUEDA:
+                    if (tempo_ko >= NOCAUTE_DURACAO_QUEDA) {
+                        fase_ko = KO_JUIZ_ENTRA;
+                        tempo_ko = 0;
+                    }
+                    break;
+
+                case KO_JUIZ_ENTRA:
+                    if (tempo_ko >= NOCAUTE_DURACAO_JUIZ) {
+                        fase_ko = ko_definitivo ? KO_FIM : KO_CONTAGEM;
+                        tempo_ko = 0;
+                    }
+                    break;
+
+                case KO_CONTAGEM:
+                    if (alvo_ko == KO_ALVO_JOGADOR) {
+                        if (IsKeyPressed(KEY_SPACE)) {
+                            // Levantou a tempo: volta com metade da vida.
+                            jogador.hp = PLAYER_VIDA_REVIVER;
+                            revivido = 1;
+                            fase_ko = KO_LEVANTA;
+                            tempo_ko = 0;
+                        } else if (tempo_ko >= NOCAUTE_CONTAGEM_JOGADOR) {
+                            // Contagem esgotada: luta perdida.
+                            encerrar_luta = 1;
+                        }
+                    } else if (tempo_ko >= NOCAUTE_CONTAGEM_BOSS) {
+                        // O chefe sempre se levanta quando o juiz chega a 5.
+                        boss.hp = obter_vida_maxima_boss(numero_boss) / 2;
+                        boss_reviveu = 1;
+                        fase_ko = KO_LEVANTA;
+                        tempo_ko = 0;
+                    }
+                    break;
+
+                case KO_LEVANTA:
+                    if (tempo_ko >= NOCAUTE_DURACAO_LEVANTAR) {
+                        fase_ko = KO_NENHUM;
+                        tempo_ko = 0;
+                        resultado = COMBATE_EM_ANDAMENTO;
+
+                        // Depois da intervenção do juiz, o chefe volta em guarda.
+                        estado_boss = BOSS_GUARDANDO;
+                        tempo_estado = 0;
+                        tempo_recuperacao_soco = 0;
+                        tempo_contra_ataque = 0;
+                        esquiva_perfeita = 0;
+                    }
+                    break;
+
+                case KO_FIM:
+                    if (tempo_ko >= NOCAUTE_DURACAO_FIM) {
+                        encerrar_luta = 1;
+                    }
+                    break;
+
+                default:
+                    break;
+            }
+
+            if (encerrar_luta) {
+                fase_ko = KO_NENHUM;
+                tempo_ko = 0;
+                tela = TELA_FINAL;
+
+                if (resultado == COMBATE_DERROTA) {
+                    // Perdeu a luta de vez: gasta um continue.
+                    continues--;
+
+                    if (continues <= 0) {
+                        continues = 0;
+                        tela = TELA_GAME_OVER;
+                        placar_registro_agora(&novo_registro, pontuacao);
+                    }
+                } else if (numero_boss == 4) {
+                    // Campanha concluída.
+                    placar_registro_agora(&novo_registro, pontuacao);
+                }
+            }
+        } else if (tela == TELA_COMBATE) {
             combat_atualizar(&jogador, tempo);
 
             if (tempo_recuperacao_soco > 0) {
@@ -423,14 +972,15 @@ int main(void) {
                 boss.hp > 0 &&
                 estado_boss == BOSS_RECUPERANDO) {
 
+                int contra_ataque = (tempo_contra_ataque > 0 && esquiva_perfeita);
+                int dano_original = jogador.dano;
+
                 soco_esquerdo = IsKeyPressed(KEY_J);
                 soco_direito = IsKeyPressed(KEY_K);
                 tempo_soco = 0.2f;
                 tempo_recuperacao_soco = 0.35f;
 
-                int dano_original = jogador.dano;
-
-                if (tempo_contra_ataque > 0 && esquiva_perfeita) {
+                if (contra_ataque) {
                     jogador.dano = PLAYER_DANO_BASE * 2;
                     tempo_contra_ataque = 0;
                     esquiva_perfeita = 0;
@@ -438,6 +988,9 @@ int main(void) {
 
                 combat_atacar(&jogador, &boss);
                 jogador.dano = dano_original;
+
+                // Recompensa por bater.
+                pontuacao += contra_ataque ? PONTOS_SOCO_CONTRA_ATAQUE : PONTOS_SOCO;
             }
 
             if (IsKeyPressed(KEY_S)) {
@@ -464,6 +1017,7 @@ int main(void) {
                         estado_boss = BOSS_PREPARANDO;
                         tempo_estado = 0;
                         direcao_esquiva = ESQUIVA_NENHUMA;
+                        jogador.esquivando = 0;
                         direcao_ataque =
                             GetRandomValue(0, 1) == 0
                                 ? ATAQUE_ESQUERDA
@@ -486,6 +1040,9 @@ int main(void) {
                             jogador.cooldown_esquiva = COOLDOWN_ESQUIVA;
                             esquiva_perfeita = 1;
                             tempo_contra_ataque = 0.8f;
+
+                            // Recompensa por desviar.
+                            pontuacao += PONTOS_ESQUIVA;
                         } else {
                             jogador.esquivando = 0;
 
@@ -520,70 +1077,204 @@ int main(void) {
             }
 
             resultado = combat_verificar_fim(&jogador, &boss);
+
+            // Empate (ambos com 0 de vida) conta como derrota do jogador.
+            if (resultado == COMBATE_EMPATE) {
+                resultado = COMBATE_DERROTA;
+            }
+
             if (resultado != COMBATE_EM_ANDAMENTO) {
-                tela = TELA_FINAL;
+                // Alguém foi nocauteado: começa a animação de queda.
+                if (resultado == COMBATE_DERROTA) {
+                    alvo_ko = KO_ALVO_JOGADOR;
+                    ko_definitivo = revivido;
+                } else {
+                    alvo_ko = KO_ALVO_BOSS;
+                    ko_definitivo = boss_reviveu;
+                }
+
+                fase_ko = KO_QUEDA;
+                tempo_ko = 0;
+
+                jogador.defendendo = 0;
+                jogador.esquivando = 0;
+                direcao_esquiva = ESQUIVA_NENHUMA;
+                tempo_soco = 0;
+                soco_esquerdo = 0;
+                soco_direito = 0;
             }
         } else if (tela == TELA_FINAL) {
             if (resultado == COMBATE_VITORIA &&
                 numero_boss < 4 &&
                 IsKeyPressed(KEY_ENTER)) {
 
+                // Próximo chefe, sempre do mais fácil para o mais difícil.
                 numero_boss++;
+                iniciar_combate = 1;
+            } else if (resultado == COMBATE_VITORIA &&
+                       numero_boss == 4 &&
+                       IsKeyPressed(KEY_ENTER)) {
 
-                reiniciar_combate(
-                    &jogador,
-                    &boss,
-                    numero_boss,
-                    &estado_boss,
-                    &tempo_estado,
-                    &tempo_soco,
-                    &tempo_recuperacao_soco,
-                    &tempo_contra_ataque,
-                    &quantidade_ataques,
-                    &soco_esquerdo,
-                    &soco_direito,
-                    &esquiva_perfeita,
-                    &resultado
-                );
+                // Campanha concluída: registra a pontuação.
+                numero_boss = 1;
+                continues = CONTINUES_INICIAIS;
+                revivido = 0;
+                opcao_menu = MENU_COMECAR;
+                tela = abrir_fim_de_partida(&ep, novo_registro.pontos);
+            } else if (resultado == COMBATE_DERROTA) {
+                if (IsKeyPressed(KEY_ENTER)) {
+                    // Usa o continue (já descontado): recomeça a MESMA luta do zero.
+                    iniciar_combate = 1;
+                } else if (IsKeyPressed(KEY_G)) {
+                    // Desistiu: a partida termina agora.
+                    placar_registro_agora(&novo_registro, pontuacao);
+                    numero_boss = 1;
+                    continues = CONTINUES_INICIAIS;
+                    revivido = 0;
+                    opcao_menu = MENU_COMECAR;
+                    tela = abrir_fim_de_partida(&ep, novo_registro.pontos);
+                }
+            }
+        } else if (tela == TELA_GAME_OVER) {
+            if (IsKeyPressed(KEY_ENTER)) {
+                // Perdeu todos os continues: registra a pontuação.
+                numero_boss = 1;
+                continues = CONTINUES_INICIAIS;
+                revivido = 0;
+                opcao_menu = MENU_COMECAR;
+                tela = abrir_fim_de_partida(&ep, novo_registro.pontos);
+            }
+        } else if (tela == TELA_NOME) {
+            int c = GetCharPressed();
 
-                direcao_esquiva = ESQUIVA_NENHUMA;
-
-                intervalo_ataque = 2.8f - boss.velocidade * 0.15f;
-                if (intervalo_ataque < 1.4f) {
-                    intervalo_ataque = 1.4f;
+            while (c > 0) {
+                if (c < 128 && isalpha(c) && ep.tam_nome < PLACAR_TAM_NOME) {
+                    ep.nome[ep.tam_nome++] = (char)toupper(c);
+                    ep.nome[ep.tam_nome] = '\0';
                 }
 
-                tela = TELA_COMBATE;
-            } else if (resultado == COMBATE_DERROTA &&
-                       IsKeyPressed(KEY_R)) {
-
-                reiniciar_combate(
-                    &jogador,
-                    &boss,
-                    numero_boss,
-                    &estado_boss,
-                    &tempo_estado,
-                    &tempo_soco,
-                    &tempo_recuperacao_soco,
-                    &tempo_contra_ataque,
-                    &quantidade_ataques,
-                    &soco_esquerdo,
-                    &soco_direito,
-                    &esquiva_perfeita,
-                    &resultado
-                );
-
-                direcao_esquiva = ESQUIVA_NENHUMA;
-                tela = TELA_COMBATE;
+                c = GetCharPressed();
             }
+
+            if (IsKeyPressed(KEY_BACKSPACE) && ep.tam_nome > 0) {
+                ep.nome[--ep.tam_nome] = '\0';
+            }
+
+            if (IsKeyPressed(KEY_ENTER) && ep.tam_nome == PLACAR_TAM_NOME) {
+                Registro r = novo_registro;
+
+                strncpy(r.nome, ep.nome, PLACAR_TAM_NOME);
+                r.nome[PLACAR_TAM_NOME] = '\0';
+
+                ep.destaque = placar_inserir(&ep.placar, &r);
+                placar_salvar(&ep.placar);
+
+                ep.opcao = 0;
+                ep.confirmar_apagar = 0;
+                tela = TELA_PLACAR;
+            }
+        } else if (tela == TELA_PLACAR) {
+            int ativar = IsKeyPressed(KEY_ENTER);
+            Vector2 mouse = GetMousePosition();
+            Vector2 movimento = GetMouseDelta();
+            int i;
+
+            if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) {
+                ep.opcao = 0;
+                ep.confirmar_apagar = 0;
+            }
+
+            if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) {
+                ep.opcao = 1;
+            }
+
+            for (i = 0; i < 2; i++) {
+                if (CheckCollisionPointRec(mouse, retangulo_botao_placar(i))) {
+                    if (movimento.x != 0 || movimento.y != 0) {
+                        if (ep.opcao != i) {
+                            ep.confirmar_apagar = 0;
+                        }
+                        ep.opcao = i;
+                    }
+
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                        if (ep.opcao != i) {
+                            ep.confirmar_apagar = 0;
+                        }
+                        ep.opcao = i;
+                        ativar = 1;
+                    }
+                }
+            }
+
+            if (ativar) {
+                if (ep.opcao == 0) {
+                    ep.confirmar_apagar = 0;
+                    tela = TELA_MENU;
+                } else if (!ep.confirmar_apagar) {
+                    // Primeiro clique só pede confirmação.
+                    ep.confirmar_apagar = 1;
+                } else {
+                    placar_apagar(&ep.placar);
+                    ep.destaque = -1;
+                    ep.pontos_fora = -1;
+                    ep.confirmar_apagar = 0;
+                }
+            }
+        }
+
+        // Começa (ou recomeça do zero) a luta do chefe atual.
+        if (iniciar_combate) {
+            iniciar_combate = 0;
+
+            reiniciar_combate(
+                &jogador,
+                &boss,
+                numero_boss,
+                &estado_boss,
+                &tempo_estado,
+                &tempo_soco,
+                &tempo_recuperacao_soco,
+                &tempo_contra_ataque,
+                &quantidade_ataques,
+                &soco_esquerdo,
+                &soco_direito,
+                &esquiva_perfeita,
+                &resultado
+            );
+
+            revivido = 0;
+            boss_reviveu = 0;
+            fase_ko = KO_NENHUM;
+            tempo_ko = 0;
+            direcao_esquiva = ESQUIVA_NENHUMA;
+
+            intervalo_ataque = 2.8f - boss.velocidade * 0.15f;
+            if (intervalo_ataque < 1.4f) {
+                intervalo_ataque = 1.4f;
+            }
+
+            tela = TELA_COMBATE;
         }
 
         BeginDrawing();
 
-        if (tela == TELA_COMBATE) {
+        if (tela == TELA_MENU) {
+            desenhar_menu(opcao_menu);
+        } else if (tela == TELA_TRANSICAO) {
+            desenhar_transicao(tempo_transicao);
+        } else if (tela == TELA_COMBATE) {
+            int em_nocaute = (fase_ko != KO_NENHUM);
+            float angulo = angulo_nocaute(fase_ko, tempo_ko);
+            float ang_jogador = (em_nocaute && alvo_ko == KO_ALVO_JOGADOR) ? -angulo : 0.0f;
+            float ang_boss = (em_nocaute && alvo_ko == KO_ALVO_BOSS) ? -angulo : 0.0f;
+
             desenhar_arena();
 
             DrawText("BEYOND THE FALLEN", 326, 28, 28, RAYWHITE);
+            desenhar_texto_centralizado(
+                TextFormat("PONTOS: %d", pontuacao), 62, 20, (Color){255, 205, 55, 255}
+            );
 
             // Vida do jogador.
             DrawText(jogador.nome, 55, 77, 22, YELLOW);
@@ -599,6 +1290,17 @@ int main(void) {
                 (int)(260.0f * hp_jogador / PLAYER_VIDA),
                 17,
                 (Color){35, 210, 75, 255}
+            );
+
+            // Continues restantes e disponibilidade do reviver.
+            DrawText(
+                TextFormat(
+                    "CONTINUES: %d   REVIVER: %s",
+                    continues,
+                    revivido ? "USADO" : "DISPONÍVEL"
+                ),
+                95, 135, 16,
+                (Color){190, 195, 205, 255}
             );
 
             // Vida do chefe.
@@ -617,36 +1319,75 @@ int main(void) {
                 17,
                 (Color){220, 45, 55, 255}
             );
+            DrawText(
+                TextFormat("REVIVER: %s", boss_reviveu ? "USADO" : "DISPONÍVEL"),
+                690, 135, 16,
+                (Color){190, 195, 205, 255}
+            );
 
-            Color roupa_boss = (Color){155, 45, 45, 255};
+            // Cores do chefe (a ursa Anastasia tem pelagem marrom).
+            int ursa = (numero_boss == 4);
+            Color roupa_boss = ursa ? (Color){112, 74, 46, 255} : (Color){155, 45, 45, 255};
 
             if (estado_boss == BOSS_PREPARANDO) {
-                roupa_boss = (Color){205, 85, 40, 255};
+                roupa_boss = ursa ? (Color){165, 92, 44, 255} : (Color){205, 85, 40, 255};
             } else if (estado_boss == BOSS_RECUPERANDO) {
-                roupa_boss = (Color){115, 55, 55, 255};
+                roupa_boss = ursa ? (Color){82, 56, 40, 255} : (Color){115, 55, 55, 255};
             }
 
             // Sombras no piso para dar profundidade.
             DrawEllipse(480, 386, 37, 9, (Color){15, 16, 18, 120});
             DrawEllipse(480, 505, 92, 15, (Color){15, 16, 18, 150});
 
-            // Chefe ao fundo, de frente para o jogador.
-            desenhar_boss_de_frente(
-                480,
-                157,
-                roupa_boss,
-                (Color){218, 178, 132, 255},
-                estado_boss == BOSS_PREPARANDO,
-                estado_boss == BOSS_PREPARANDO
-            );
+            // Chefe ao fundo, de frente para o jogador (gira ao cair).
+            int topo_boss = ursa ? 140 : 157;
+            int pivo_boss_y = topo_boss + (ursa ? 110 : 105);
+            int boss_em_guarda = (!em_nocaute && estado_boss == BOSS_GUARDANDO);
+            int boss_atacando = (!em_nocaute && estado_boss == BOSS_PREPARANDO);
+            int lado_boss = (direcao_ataque == ATAQUE_ESQUERDA) ? -1 : 1;
 
-            // Jogador em primeiro plano, visto de costas.
+            rlPushMatrix();
+            rlTranslatef(480.0f, (float)pivo_boss_y, 0.0f);
+            rlRotatef(ang_boss, 0.0f, 0.0f, 1.0f);
+            rlTranslatef(-480.0f, (float)(-pivo_boss_y), 0.0f);
+
+            if (ursa) {
+                desenhar_urso_de_frente(
+                    480, topo_boss, roupa_boss,
+                    boss_atacando, boss_em_guarda, lado_boss
+                );
+            } else {
+                desenhar_boss_de_frente(
+                    480, topo_boss, roupa_boss,
+                    (Color){218, 178, 132, 255},
+                    boss_atacando, boss_em_guarda, lado_boss
+                );
+            }
+
+            rlPopMatrix();
+
+            if (em_nocaute && alvo_ko == KO_ALVO_BOSS) {
+                // Cabeça do chefe caído: à esquerda do pivô.
+                desenhar_estrelas(
+                    480.0f - (float)(pivo_boss_y - (topo_boss + 25)),
+                    (float)pivo_boss_y,
+                    22.0f
+                );
+                desenhar_juiz_nocaute(alvo_ko, fase_ko, tempo_ko);
+            }
+
+            // Jogador em primeiro plano, visto de costas (gira ao cair).
             int direcao_visual_esquiva = 0;
             if (direcao_esquiva == ESQUIVA_ESQUERDA) {
                 direcao_visual_esquiva = -1;
             } else if (direcao_esquiva == ESQUIVA_DIREITA) {
                 direcao_visual_esquiva = 1;
             }
+
+            rlPushMatrix();
+            rlTranslatef(480.0f, 445.0f, 0.0f);
+            rlRotatef(ang_jogador, 0.0f, 0.0f, 1.0f);
+            rlTranslatef(-480.0f, -445.0f, 0.0f);
 
             desenhar_jogador_de_costas(
                 480,
@@ -657,6 +1398,8 @@ int main(void) {
                 direcao_visual_esquiva
             );
 
+            rlPopMatrix();
+
             if (jogador.defendendo) {
                 DrawEllipseLines(
                     480, 386, 91, 113,
@@ -664,49 +1407,98 @@ int main(void) {
                 );
             }
 
-            // Controles.
-            DrawText("J/K: SOCO", 95, 475, 18, RAYWHITE);
-            DrawText("S: DEFESA", 400, 475, 18, RAYWHITE);
-            DrawText("A/D: ESQUIVA", 700, 475, 18, RAYWHITE);
+            if (em_nocaute && alvo_ko == KO_ALVO_JOGADOR) {
+                desenhar_estrelas(480.0f - 117.0f, 445.0f, 36.0f);
+                desenhar_juiz_nocaute(alvo_ko, fase_ko, tempo_ko);
+            }
 
-            DrawText(
-                TextFormat("ESQUIVA %.1f", jogador.cooldown_esquiva),
-                95, 505, 16,
-                (Color){190, 195, 205, 255}
-            );
-            DrawText(
-                TextFormat("DEFESA %.1f", jogador.cooldown_defesa),
-                400, 505, 16,
-                (Color){190, 195, 205, 255}
-            );
+            if (!em_nocaute) {
+                // Controles.
+                DrawText("J/K: SOCO", 95, 475, 18, RAYWHITE);
+                DrawText("S: DEFESA", 400, 475, 18, RAYWHITE);
+                DrawText("A/D: ESQUIVA", 700, 475, 18, RAYWHITE);
+
+                DrawText(
+                    TextFormat("ESQUIVA %.1f", jogador.cooldown_esquiva),
+                    95, 505, 16,
+                    (Color){190, 195, 205, 255}
+                );
+                DrawText(
+                    TextFormat("DEFESA %.1f", jogador.cooldown_defesa),
+                    400, 505, 16,
+                    (Color){190, 195, 205, 255}
+                );
+            } else {
+                // Mensagens do nocaute.
+                if (tempo_ko < 0.25f && fase_ko == KO_QUEDA) {
+                    DrawRectangle(
+                        0, 0, LARGURA_TELA, ALTURA_TELA,
+                        Fade(WHITE, 0.6f * (1.0f - tempo_ko / 0.25f))
+                    );
+                }
+
+                if (fase_ko == KO_QUEDA || fase_ko == KO_JUIZ_ENTRA || fase_ko == KO_FIM) {
+                    desenhar_texto_centralizado("NOCAUTE!", 172, 64, BLACK);
+                    desenhar_texto_centralizado("NOCAUTE!", 168, 64, RED);
+                }
+
+                if (fase_ko == KO_CONTAGEM && alvo_ko == KO_ALVO_JOGADOR) {
+                    if (((int)(GetTime() * 3.0)) % 2 == 0) {
+                        desenhar_texto_centralizado(
+                            "APERTE ESPAÇO PARA LEVANTAR!", 340, 30, YELLOW
+                        );
+                    }
+                } else if (fase_ko == KO_CONTAGEM) {
+                    DrawText(
+                        "O chefe tenta se levantar...", 40, 505, 18,
+                        (Color){190, 195, 205, 255}
+                    );
+                }
+            }
         } else if (tela == TELA_FINAL) {
             ClearBackground((Color){22, 24, 29, 255});
 
             if (resultado == COMBATE_VITORIA && numero_boss < 4) {
-                DrawText("VITORIA", 365, 170, 52, GREEN);
-                DrawText(
-                    "ENTER: PRÓXIMO COMBATE",
-                    285, 275, 22, RAYWHITE
-                );
-            } else if (resultado == COMBATE_VITORIA) {
-                DrawText(
-                    "CAMPEÃO",
-                    360, 170, 52,
+                desenhar_texto_centralizado("VITORIA", 170, 52, GREEN);
+                desenhar_texto_centralizado(
+                    TextFormat("PONTOS: %d", pontuacao), 235, 24,
                     (Color){255, 205, 55, 255}
                 );
-                DrawText(
-                    "VOCÊ VENCEU A CAMPANHA",
-                    280, 255, 24, RAYWHITE
+                desenhar_texto_centralizado("ENTER: PRÓXIMO COMBATE", 285, 22, RAYWHITE);
+            } else if (resultado == COMBATE_VITORIA) {
+                desenhar_texto_centralizado(
+                    "CAMPEÃO", 170, 52, (Color){255, 205, 55, 255}
                 );
-            } else if (resultado == COMBATE_DERROTA) {
-                DrawText("DERROTA", 365, 170, 52, RED);
-                DrawText(
-                    "R: TENTAR NOVAMENTE",
-                    320, 275, 22, RAYWHITE
+                desenhar_texto_centralizado("VOCÊ VENCEU A CAMPANHA", 255, 24, RAYWHITE);
+                desenhar_texto_centralizado(
+                    TextFormat("PONTUAÇÃO: %d", pontuacao), 298, 30,
+                    (Color){255, 205, 55, 255}
                 );
+                desenhar_texto_centralizado("ENTER: REGISTRAR PONTUAÇÃO", 360, 22, RAYWHITE);
             } else {
-                DrawText("EMPATE", 380, 170, 52, YELLOW);
+                desenhar_texto_centralizado("DERROTA", 150, 52, RED);
+                desenhar_texto_centralizado(
+                    TextFormat("CONTINUES RESTANTES: %d", continues),
+                    235, 24, RAYWHITE
+                );
+                desenhar_texto_centralizado(
+                    "ENTER: RECOMEÇAR A LUTA DO ZERO", 285, 24, YELLOW
+                );
+                desenhar_texto_centralizado(
+                    "G: DESISTIR E IR PARA O PLACAR", 330, 24,
+                    (Color){190, 195, 205, 255}
+                );
+                desenhar_texto_centralizado(
+                    TextFormat("PONTUAÇÃO ATUAL: %d", pontuacao), 400, 22,
+                    (Color){255, 205, 55, 255}
+                );
             }
+        } else if (tela == TELA_GAME_OVER) {
+            desenhar_game_over(pontuacao);
+        } else if (tela == TELA_NOME) {
+            desenhar_tela_nome(&ep, &novo_registro);
+        } else if (tela == TELA_PLACAR) {
+            desenhar_placar(&ep);
         }
 
         EndDrawing();
