@@ -1077,6 +1077,7 @@ int main(void) {
             }
         } else if (tela == TELA_COMBATE) {
             combat_atualizar(&jogador, tempo);
+            boss_update(&boss); //função da nova animação do boss
 
             if (tempo_recuperacao_soco > 0) {
                 tempo_recuperacao_soco -= tempo;
