@@ -1,30 +1,28 @@
-#include "raylib.h"
-#include "rlgl.h"
-#include <ctype.h>
-#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include "raylib.h"
 #include "player.h"
 #include "boss.h"
 #include "combat.h"
 #include "config.h"
-#include "placar.h"
-#include "estatisticas.h"
+
+#define ARQUIVO_PLACAR "placar.txt"
+#define MAX_REGISTROS_PLACAR 10
 
 typedef enum {
     TELA_MENU,
     TELA_TRANSICAO,
     TELA_COMBATE,
     TELA_FINAL,
-    TELA_GAME_OVER,
-    TELA_NOME,
-    TELA_PLACAR
+    TELA_GAME_OVER
 } Tela;
 
 typedef enum {
     BOSS_GUARDANDO,
     BOSS_PREPARANDO,
     BOSS_ATACANDO,
-    BOSS_RECUPERANDO,
+    BOSS_RECUPERANDO
 } EstadoBoss;
 
 typedef enum {
@@ -46,45 +44,15 @@ typedef struct {
     Rectangle hitbox_ataque_boss;
 } HitboxesCombate;
 
-// Sequência de nocaute: queda -> juiz entra -> contagem -> levanta (ou fim).
-typedef enum {
-    KO_NENHUM,
-    KO_QUEDA,
-    KO_JUIZ_ENTRA,
-    KO_CONTAGEM,
-    KO_LEVANTA,
-    KO_FIM
-} FaseKO;
-
-typedef enum {
-    KO_ALVO_JOGADOR,
-    KO_ALVO_BOSS
-} AlvoKO;
-
-// Opções do menu inicial.
-#define MENU_COMECAR 0
-#define MENU_PLACAR 1
-#define MENU_SAIR 2
-#define MENU_TOTAL 3
-
-// Tudo que a tela de nome e a tela de placar precisam.
 typedef struct {
-    Placar placar;
-    int destaque;            // linha do recorde recém-inserido (-1 = nenhuma)
-    int pontos_fora;         // pontuação que não entrou no placar (-1 = nenhuma)
-    int opcao;               // 0 = VOLTAR, 1 = APAGAR RECORDES
-    int confirmar_apagar;    // 1 = próximo clique/ENTER apaga de verdade
-    char nome[PLACAR_TAM_NOME + 1];
-    int tam_nome;
-} EstadoPlacar;
-
-// Texto de "documento" mostrado embaixo do nome de cada chefe.
-static const char *PAPEIS_CHEFES[NUM_CHEFES] = {
-    "PRESO 214 - TRAIÇÃO À PÁTRIA",
-    "PRESO - REVOLUCIONÁRIO",
-    "GUARDA DA PRISÃO",
-    "DESAFIO FINAL"
-};
+    char jogador[32];
+    int pontuacao;
+    int chefes_derrotados;
+    int golpes_acertados;
+    int esquivas_perfeitas;
+    int golpes_recebidos;
+    char resultado[32];
+} RegistroPlacar;
 
 static void iniciar_boss(Boss *boss, int numero_boss) {
     switch (numero_boss) {
@@ -116,11 +84,183 @@ static int obter_vida_maxima_boss(int numero_boss) {
     }
 }
 
+static float calcular_intervalo_ataque(const Boss *boss) {
+    float intervalo = 2.8f - (float)boss->velocidade * 0.15f;
+    if (intervalo < 1.4f) {
+        intervalo = 1.4f;
+    }
+    return intervalo;
+}
+
 static void desenhar_texto_centralizado(const char *texto, int y, int tamanho, Color cor) {
     int largura = MeasureText(texto, tamanho);
     DrawText(texto, (LARGURA_TELA - largura) / 2, y, tamanho, cor);
 }
 
+/*
+ * Remove espaços extras nas extremidades de uma string lida do arquivo.
+ */
+static void limpar_espacos(char *texto) {
+    int inicio = 0;
+    int fim = (int)strlen(texto) - 1;
+
+    while (texto[inicio] == ' ' || texto[inicio] == '\t') {
+        inicio++;
+    }
+    while (fim >= inicio && (texto[fim] == ' ' || texto[fim] == '\t' || texto[fim] == '\r' || texto[fim] == '\n')) {
+        fim--;
+    }
+
+    int len = fim - inicio + 1;
+    if (len > 0) {
+        memmove(texto, texto + inicio, (size_t)len);
+        texto[len] = '\0';
+    } else {
+        texto[0] = '\0';
+    }
+}
+
+/*
+ * Carrega os registros existentes de placar.txt para manipulação em memória.
+ */
+static int carregar_placar_txt(const char *caminho, RegistroPlacar lista[], int max_itens) {
+    FILE *arquivo = fopen(caminho, "r");
+    if (!arquivo) {
+        return 0;
+    }
+
+    char linha[256];
+    int total = 0;
+
+    while (fgets(linha, sizeof(linha), arquivo) && total < max_itens) {
+        int pos = 0;
+        RegistroPlacar reg = {0};
+
+        if (sscanf(
+                linha,
+                " %d | %31[^|] | %d | %d/%*d | %d | %d | %d | %31[^\r\n]",
+                &pos,
+                reg.jogador,
+                ®.pontuacao,
+                ®.chefes_derrotados,
+                ®.golpes_acertados,
+                ®.esquivas_perfeitas,
+                ®.golpes_recebidos,
+                reg.resultado
+            ) == 8) {
+            limpar_espacos(reg.jogador);
+            limpar_espacos(reg.resultado);
+            lista[total++] = reg;
+        }
+    }
+
+    fclose(arquivo);
+    return total;
+}
+
+static void ordenar_placar(RegistroPlacar lista[], int total) {
+    for (int i = 0; i < total - 1; i++) {
+        for (int j = 0; j < total - i - 1; j++) {
+            int trocar = 0;
+            if (lista[j].pontuacao < lista[j + 1].pontuacao) {
+                trocar = 1;
+            } else if (lista[j].pontuacao == lista[j + 1].pontuacao &&
+                       lista[j].chefes_derrotados < lista[j + 1].chefes_derrotados) {
+                trocar = 1;
+            }
+
+            if (trocar) {
+                RegistroPlacar temp = lista[j];
+                lista[j] = lista[j + 1];
+                lista[j + 1] = temp;
+            }
+        }
+    }
+}
+
+/*
+ * Imprime o placar manipulado e ordenado no arquivo placar.txt.
+ */
+static void gravar_placar_txt(const char *caminho, const RegistroPlacar lista[], int total) {
+    FILE *arquivo = fopen(caminho, "w");
+    if (!arquivo) {
+        return;
+    }
+
+    fprintf(arquivo, "====================================================================================\n");
+    fprintf(arquivo, "                        BEYOND THE FALLEN - PLACAR OFICIAL                          \n");
+    fprintf(arquivo, "====================================================================================\n");
+    fprintf(arquivo, "POS | JOGADOR        | PONTOS | CHEFES | ACERTOS | ESQUIVAS | SOFRIDOS | RESULTADO  \n");
+    fprintf(arquivo, "------------------------------------------------------------------------------------\n");
+
+    for (int i = 0; i < total; i++) {
+        fprintf(
+            arquivo,
+            "%3d | %-14.14s | %6d |   %d/4  | %7d | %8d | %8d | %-11.11s\n",
+            i + 1,
+            lista[i].jogador,
+            lista[i].pontuacao,
+            lista[i].chefes_derrotados,
+            lista[i].golpes_acertados,
+            lista[i].esquivas_perfeitas,
+            lista[i].golpes_recebidos,
+            lista[i].resultado
+        );
+    }
+
+    fprintf(arquivo, "====================================================================================\n");
+    fclose(arquivo);
+}
+
+/*
+ * Atualiza a entrada da partida atual no ranking, ordena e grava em placar.txt.
+ * Retorna a posição atual do jogador no ranking (1..MAX_REGISTROS_PLACAR).
+ */
+static int sincronizar_placar_txt(
+    const char *caminho,
+    const RegistroPlacar *partida_atual,
+    int *indice_salvo
+) {
+    RegistroPlacar lista[MAX_REGISTROS_PLACAR + 1];
+    int total = carregar_placar_txt(caminho, lista, MAX_REGISTROS_PLACAR);
+
+    if (*indice_salvo >= 0 && *indice_salvo < total) {
+        lista[*indice_salvo] = *partida_atual;
+    } else if (total < MAX_REGISTROS_PLACAR) {
+        *indice_salvo = total;
+        lista[total++] = *partida_atual;
+    } else {
+        lista[total] = *partida_atual;
+        total++;
+    }
+
+    ordenar_placar(lista, total);
+    if (total > MAX_REGISTROS_PLACAR) {
+        total = MAX_REGISTROS_PLACAR;
+    }
+
+    int posicao = 1;
+    *indice_salvo = -1;
+    for (int i = 0; i < total; i++) {
+        if (strcmp(lista[i].jogador, partida_atual->jogador) == 0 &&
+            lista[i].pontuacao == partida_atual->pontuacao &&
+            lista[i].chefes_derrotados == partida_atual->chefes_derrotados &&
+            lista[i].golpes_acertados == partida_atual->golpes_acertados &&
+            strcmp(lista[i].resultado, partida_atual->resultado) == 0) {
+            *indice_salvo = i;
+            posicao = i + 1;
+            break;
+        }
+    }
+
+    gravar_placar_txt(caminho, lista, total);
+    return posicao;
+}
+
+/*
+ * Calcula todas as hitboxes e hurtboxes do combate com base nas posições
+ * e estados atuais dos lutadores na arena.
+ */
 static HitboxesCombate calcular_hitboxes_combate(
     int centro_x,
     int jogador_topo_y,
@@ -323,60 +463,43 @@ static void desenhar_jogador_de_costas(
     }
 }
 
-// Braço como uma linha grossa (evita repetir o cast em todo lugar).
-static void desenhar_braco(int x1, int y1, int x2, int y2, int largura, Color cor) {
-    DrawLineEx((Vector2){(float)x1, (float)y1}, (Vector2){(float)x2, (float)y2}, (float)largura, cor);
-}
-
-// Estrela de cinco pontas: liga cada ponta na ponta dois lugares à frente.
-static void desenhar_estrela(int cx, int cy, int raio, Color cor) {
-    Vector2 ponta[5];
-    int i;
-
-    for (i = 0; i < 5; i++) {
-        float angulo = -PI / 2 + i * 2 * PI / 5;
-        ponta[i].x = cx + cosf(angulo) * raio;
-        ponta[i].y = cy + sinf(angulo) * raio;
-    }
-
-    for (i = 0; i < 5; i++) {
-        DrawLineEx(ponta[i], ponta[(i + 2) % 5], 2, cor);
-    }
-}
-
-// Cor da roupa de cada chefe. Quando ele prepara o golpe fica avermelhado,
-// quando está se recuperando fica mais escuro.
-static Color cor_uniforme(int numero_boss, EstadoBoss estado) {
-    Color cor;
-    int r;
-
-    switch (numero_boss) {
-        case 1: cor = (Color){96, 104, 112, 255}; break;   // uniforme de preso
-        case 2: cor = (Color){120, 84, 56, 255}; break;    // casaco velho
-        case 3: cor = (Color){70, 86, 62, 255}; break;     // uniforme de guarda
-        default: cor = (Color){112, 74, 46, 255}; break;   // pelo da ursa
-    }
-
-    if (estado == BOSS_PREPARANDO) {
-        r = cor.r + 70;
-        cor.r = r > 255 ? 255 : r;
-        cor.g = cor.g + 10;
-        cor.b = cor.b / 2;
-    } else if (estado == BOSS_RECUPERANDO) {
-        cor.r = cor.r * 7 / 10;
-        cor.g = cor.g * 7 / 10;
-        cor.b = cor.b * 7 / 10;
-    }
-
-    return cor;
-}
-
 /*
- * Desenha os chefes 1, 2 e 3 de frente, ao fundo. Estilo chapado, com blocos
- * de cor, inspirado em Papers, Please.
- * 1 = Bobrovsky (preso, corpulento), 2 = Vladimir (preso revolucionário, magro),
- * 3 = Ivan (guarda da prisão, forte e lento).
+ * Desenho frontal do jogador usado nos cards das telas de transição.
  */
+static void desenhar_jogador_card(int centro_x, int topo_y) {
+    int x = centro_x;
+    int y = topo_y;
+
+    Color roupa = (Color){25, 75, 145, 255};
+    Color detalhe = (Color){60, 130, 220, 255};
+    Color pele = (Color){218, 178, 132, 255};
+    Color luva = (Color){190, 35, 35, 255};
+    Color calca = (Color){30, 40, 58, 255};
+
+    // Pernas e botas.
+    DrawRectangle(x - 24, y + 102, 18, 44, calca);
+    DrawRectangle(x + 6, y + 102, 18, 44, calca);
+    DrawRectangle(x - 28, y + 140, 23, 10, (Color){35, 31, 29, 255});
+    DrawRectangle(x + 5, y + 140, 23, 10, (Color){35, 31, 29, 255});
+
+    // Tronco.
+    DrawRectangle(x - 36, y + 42, 72, 65, roupa);
+    DrawRectangle(x - 36, y + 88, 72, 11, detalhe);
+
+    // Cabeça e rosto.
+    DrawCircle(x, y + 23, 24, pele);
+    DrawRectangle(x - 24, y + 4, 48, 12, (Color){65, 43, 31, 255});
+    DrawCircle(x - 8, y + 23, 2, BLACK);
+    DrawCircle(x + 8, y + 23, 2, BLACK);
+    DrawLine(x - 6, y + 33, x + 6, y + 33, (Color){95, 45, 38, 255});
+
+    // Guarda de boxe.
+    DrawLineEx((Vector2){(float)(x - 30), (float)(y + 60)}, (Vector2){(float)(x - 19), (float)(y + 40)}, 14, roupa);
+    DrawLineEx((Vector2){(float)(x + 30), (float)(y + 60)}, (Vector2){(float)(x + 19), (float)(y + 40)}, 14, roupa);
+    DrawCircle(x - 19, y + 38, 12, luva);
+    DrawCircle(x + 19, y + 38, 12, luva);
+}
+
 /*
  * Desenha o chefe menor e ao fundo, de frente para a câmera.
  */
