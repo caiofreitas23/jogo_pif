@@ -1036,15 +1036,26 @@ static void desenhar_tela_nome(const EstadoPlacar *ep, const Registro *r) {
  * Transição entre o menu e a primeira luta: contagem regressiva de
  * TEMPO_TRANSICAO segundos, com fade-in no início e fade-out no final.
  */
-static void desenhar_transicao(float restante) {
+static void desenhar_transicao(
+    float restante,
+    float duracao_total,
+    const Player *jogador,
+    const Boss *boss,
+    int numero_boss,
+    int continues,
+    int pontuacao_atual
+) {
     Color cinza = (Color){190, 195, 205, 255};
     Color dourado = (Color){255, 205, 55, 255};
+    Color painel_fundo = (Color){24, 27, 34, 245};
+    Color borda_jogador = (Color){65, 145, 235, 255};
+    Color borda_boss = (Color){220, 65, 65, 255};
 
-    float decorrido = TEMPO_TRANSICAO - restante;
+    float decorrido = duracao_total - restante;
     float alfa = 1.0f;
 
-    if (decorrido < 1.0f) alfa = decorrido;
-    if (restante < alfa) alfa = restante;
+    if (decorrido < 0.6f) alfa = decorrido / 0.6f;
+    if (restante < 0.6f && (restante / 0.6f) < alfa) alfa = restante / 0.6f;
     if (alfa < 0.0f) alfa = 0.0f;
     if (alfa > 1.0f) alfa = 1.0f;
 
@@ -1053,26 +1064,152 @@ static void desenhar_transicao(float restante) {
 
     ClearBackground((Color){12, 13, 16, 255});
 
-    desenhar_texto_centralizado("PREPARE-SE", 60, 40, Fade(RAYWHITE, alfa));
-    desenhar_texto_centralizado("A LUTA COMEÇA EM", 125, 24, Fade(cinza, alfa));
-    desenhar_texto_centralizado(TextFormat("%d", segundos), 165, 110, Fade(dourado, alfa));
+    // Cabeçalho e contagem regressiva.
+    desenhar_texto_centralizado(
+        TextFormat("COMBATE %d DE 4 - PREPARE-SE", numero_boss),
+        16, 28, Fade(RAYWHITE, alfa)
+    );
+    desenhar_texto_centralizado(
+        TextFormat("A LUTA COMEÇA EM %d SEGUNDO%s", segundos, segundos == 1 ? "" : "S"),
+        50, 20, Fade(dourado, alfa)
+    );
 
-    // Barra de progresso da contagem.
-    int largura_barra = 400;
+    int largura_barra = 420;
     int barra_x = (LARGURA_TELA - largura_barra) / 2;
-    DrawRectangle(barra_x, 310, largura_barra, 10, Fade(DARKGRAY, alfa));
+    DrawRectangle(barra_x, 76, largura_barra, 8, Fade(DARKGRAY, alfa));
     DrawRectangle(
-        barra_x, 310,
-        (int)(largura_barra * decorrido / TEMPO_TRANSICAO),
-        10,
+        barra_x, 76,
+        (int)(largura_barra * decorrido / duracao_total),
+        8,
         Fade(dourado, alfa)
     );
 
-    desenhar_texto_centralizado("A / D : ESQUIVAR para o lado OPOSTO ao braço do chefe", 365, 20, Fade(cinza, alfa));
-    desenhar_texto_centralizado("S : DEFENDER (reduz o dano pela metade)", 400, 20, Fade(cinza, alfa));
-    desenhar_texto_centralizado("J / K : SOCO (quando o chefe estiver se recuperando)", 435, 20, Fade(cinza, alfa));
+    // Painel esquerdo: JOGADOR.
+    DrawRectangle(40, 96, 380, 376, Fade(painel_fundo, alfa));
+    DrawRectangleLinesEx((Rectangle){40, 96, 380, 376}, 2, Fade(borda_jogador, alfa));
+    DrawText(jogador->nome, 60, 106, 22, Fade(YELLOW, alfa));
+    DrawText("DESAFIANTE", 305, 110, 14, Fade(borda_jogador, alfa));
+
+    desenhar_jogador_card(230, 136);
+    DrawLine(58, 294, 402, 294, Fade((Color){60, 66, 80, 255}, alfa));
+
+    DrawText(
+        TextFormat("Vida: %d / %d (Reviver: %d)", jogador->hp, PLAYER_VIDA, PLAYER_VIDA_REVIVER),
+        60, 304, 17, Fade(RAYWHITE, alfa)
+    );
+    DrawText(
+        TextFormat("Dano Base: %d", jogador->dano),
+        60, 328, 17, Fade(RAYWHITE, alfa)
+    );
+    DrawText(
+        TextFormat("Dano Contra-Ataque: %d", PLAYER_DANO_BASE * 2),
+        60, 352, 17, Fade(dourado, alfa)
+    );
+    DrawText(
+        TextFormat("Cooldown Esquiva: %.1fs | Defesa: 50%%", (float)COOLDOWN_ESQUIVA),
+        60, 376, 17, Fade(cinza, alfa)
+    );
+    DrawText(
+        TextFormat("Continues Restantes: %d", continues),
+        60, 400, 17, Fade(cinza, alfa)
+    );
+    DrawText(
+        TextFormat("Placar Acumulado: %d pts", pontuacao_atual),
+        60, 424, 17, Fade(GREEN, alfa)
+    );
+
+    // Emblema central VS.
+    DrawText("VS", 452, 255, 42, Fade(dourado, alfa));
+
+    // Painel direito: CHEFE DA VEZ.
+    int vida_max_boss = obter_vida_maxima_boss(numero_boss);
+    float intervalo_boss = calcular_intervalo_ataque(boss);
+
+    DrawRectangle(540, 96, 380, 376, Fade(painel_fundo, alfa));
+    DrawRectangleLinesEx((Rectangle){540, 96, 380, 376}, 2, Fade(borda_boss, alfa));
+    DrawText(boss->nome, 560, 106, 22, Fade(RED, alfa));
+    DrawText(TextFormat("CHEFE #%d", numero_boss), 825, 110, 14, Fade(borda_boss, alfa));
+
+    desenhar_boss_de_frente(
+        730,
+        135,
+        (Color){155, 45, 45, 255},
+        (Color){218, 178, 132, 255},
+        BOSS_GUARDANDO,
+        -1
+    );
+    DrawLine(558, 294, 902, 294, Fade((Color){60, 66, 80, 255}, alfa));
+
+    DrawText(
+        TextFormat("Vida: %d / %d", boss->hp, vida_max_boss),
+        560, 304, 17, Fade(RAYWHITE, alfa)
+    );
+    DrawText(
+        TextFormat("Dano Base: %d", boss->dano),
+        560, 328, 17, Fade(RAYWHITE, alfa)
+    );
+    if (numero_boss == 4) {
+        DrawText(
+            TextFormat("Dano Especial (3o golpe): %d", ANASTASIA_DANO_ESPECIAL),
+            560, 352, 17, Fade(ORANGE, alfa)
+        );
+    } else {
+        DrawText("Dano Especial: Nenhum", 560, 352, 17, Fade(cinza, alfa));
+    }
+    DrawText(
+        TextFormat("Velocidade: %.1f", (float)boss->velocidade),
+        560, 376, 17, Fade(RAYWHITE, alfa)
+    );
+    DrawText(
+        TextFormat("Intervalo entre Ataques: %.2fs", intervalo_boss),
+        560, 400, 17, Fade(cinza, alfa)
+    );
+    DrawText(
+        TextFormat("Nivel de Ameaça: %d / 4", numero_boss),
+        560, 424, 17, Fade(borda_boss, alfa)
+    );
+
+    // Dica rápida de controles no rodapé.
+    desenhar_texto_centralizado(
+        "A / D : Esquivar   |   S : Defender   |   J / K : Soco",
+        492, 18, Fade(cinza, alfa)
+    );
 }
 
+static void desenhar_game_over(const RegistroPlacar *placar, int posicao_ranking) {
+    ClearBackground((Color){22, 24, 29, 255});
+
+    desenhar_texto_centralizado("GAME OVER", 95, 64, RED);
+    desenhar_texto_centralizado("Você perdeu todos os continues.", 175, 24, RAYWHITE);
+
+    desenhar_texto_centralizado(
+        TextFormat(
+            "Pontuação Final: %d pts  |  Ranking (%s): #%d",
+            placar->pontuacao,
+            ARQUIVO_PLACAR,
+            posicao_ranking
+        ),
+        235, 22, YELLOW
+    );
+    desenhar_texto_centralizado(
+        TextFormat(
+            "Chefes: %d/4  |  Acertos: %d  |  Esquivas: %d  |  Golpes Sofridos: %d",
+            placar->chefes_derrotados,
+            placar->golpes_acertados,
+            placar->esquivas_perfeitas,
+            placar->golpes_recebidos
+        ),
+        275, 19, (Color){190, 195, 205, 255}
+    );
+    desenhar_texto_centralizado(
+        "Placar salvo e atualizado em placar.txt",
+        315, 18, GREEN
+    );
+
+    desenhar_texto_centralizado(
+        "ENTER: VOLTAR AO MENU (O JOGO RECOMEÇA)", 390, 22, RAYWHITE
+    );
+}
 
 int main(void) {
     Player jogador;
