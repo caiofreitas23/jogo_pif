@@ -8,7 +8,6 @@
 #include "combat.h"
 #include "config.h"
 #include "placar.h"
-#define NUM_CHEFES 4
 #include "estatisticas.h"
 
 typedef enum {
@@ -69,6 +68,14 @@ typedef struct {
     char nome[PLACAR_TAM_NOME + 1];
     int tam_nome;
 } EstadoPlacar;
+
+// Texto de "documento" mostrado embaixo do nome de cada chefe.
+static const char *PAPEIS_CHEFES[NUM_CHEFES] = {
+    "PRESO 214 - TRAIÇÃO À PÁTRIA",
+    "PRESO - REVOLUCIONÁRIO",
+    "GUARDA DA PRISÃO",
+    "DESAFIO FINAL"
+};
 
 static void iniciar_boss(Boss *boss, int numero_boss) {
     switch (numero_boss) {
@@ -204,89 +211,206 @@ static void desenhar_jogador_de_costas(
     }
 }
 
+// Braço como uma linha grossa (evita repetir o cast em todo lugar).
+static void desenhar_braco(int x1, int y1, int x2, int y2, int largura, Color cor) {
+    DrawLineEx((Vector2){(float)x1, (float)y1}, (Vector2){(float)x2, (float)y2}, (float)largura, cor);
+}
+
+// Estrela de cinco pontas: liga cada ponta na ponta dois lugares à frente.
+static void desenhar_estrela(int cx, int cy, int raio, Color cor) {
+    Vector2 ponta[5];
+    int i;
+
+    for (i = 0; i < 5; i++) {
+        float angulo = -PI / 2 + i * 2 * PI / 5;
+        ponta[i].x = cx + cosf(angulo) * raio;
+        ponta[i].y = cy + sinf(angulo) * raio;
+    }
+
+    for (i = 0; i < 5; i++) {
+        DrawLineEx(ponta[i], ponta[(i + 2) % 5], 2, cor);
+    }
+}
+
+// Cor da roupa de cada chefe. Quando ele prepara o golpe fica avermelhado,
+// quando está se recuperando fica mais escuro.
+static Color cor_uniforme(int numero_boss, EstadoBoss estado) {
+    Color cor;
+    int r;
+
+    switch (numero_boss) {
+        case 1: cor = (Color){96, 104, 112, 255}; break;   // uniforme de preso
+        case 2: cor = (Color){120, 84, 56, 255}; break;    // casaco velho
+        case 3: cor = (Color){70, 86, 62, 255}; break;     // uniforme de guarda
+        default: cor = (Color){112, 74, 46, 255}; break;   // pelo da ursa
+    }
+
+    if (estado == BOSS_PREPARANDO) {
+        r = cor.r + 70;
+        cor.r = r > 255 ? 255 : r;
+        cor.g = cor.g + 10;
+        cor.b = cor.b / 2;
+    } else if (estado == BOSS_RECUPERANDO) {
+        cor.r = cor.r * 7 / 10;
+        cor.g = cor.g * 7 / 10;
+        cor.b = cor.b * 7 / 10;
+    }
+
+    return cor;
+}
+
 /*
- * Desenha o chefe menor e ao fundo, de frente para a câmera.
+ * Desenha os chefes 1, 2 e 3 de frente, ao fundo. Estilo chapado, com blocos
+ * de cor, inspirado em Papers, Please.
+ * 1 = Bobrovsky (preso, corpulento), 2 = Vladimir (preso revolucionário, magro),
+ * 3 = Ivan (guarda da prisão, forte e lento).
  */
 static void desenhar_boss_de_frente(
     int centro_x,
     int topo_y,
+    int numero_boss,
     Color roupa,
-    Color pele,
     int atacando,
     int defendendo,
     int lado_ataque
 ) {
     int x = centro_x;
     int y = topo_y;
+    int i;
 
-    Color luva = (Color){190, 35, 35, 255};
-    Color sombra = (Color){80, 35, 35, 255};
-    Color calca = (Color){48, 43, 42, 255};
+    Color pele = (Color){210, 172, 135, 255};
+    Color luva = (Color){150, 40, 40, 255};
+    Color calca = (Color){45, 42, 42, 255};
+    Color preto = (Color){25, 24, 24, 255};
+    Color ouro = (Color){200, 165, 50, 255};
+    Color vermelho = (Color){175, 30, 30, 255};
+    Color cabelo = (Color){60, 40, 30, 255};
+    Color manga = roupa;
 
-    // Pernas.
-    DrawRectangle(x - 25, y + 104, 19, 48, calca);
-    DrawRectangle(x + 6, y + 104, 19, 48, calca);
+    // Tamanho do corpo de cada um.
+    int meia_largura = 44;    // metade da largura do tronco
+    int alto_tronco = 70;
+    int largura_perna = 20;
+    int largura_braco = 18;
+    int meia_cabeca = 26;
+    int raio_luva = 13;
+
+    if (numero_boss == 1) {
+        meia_largura = 54;
+        alto_tronco = 72;
+        largura_perna = 25;
+        largura_braco = 22;
+        meia_cabeca = 28;
+        raio_luva = 15;
+        manga = pele;   // braços de fora
+    } else if (numero_boss == 2) {
+        meia_largura = 28;
+        alto_tronco = 66;
+        largura_perna = 12;
+        largura_braco = 10;
+        meia_cabeca = 22;
+        raio_luva = 11;
+    }
+
+    int ombro = meia_largura - 8;
+
+    // Pernas e botas.
+    DrawRectangle(x - 3 - largura_perna, y + 104, largura_perna, 48, calca);
+    DrawRectangle(x + 3, y + 104, largura_perna, 48, calca);
+    DrawRectangle(x - 5 - largura_perna, y + 142, largura_perna + 4, 10, preto);
+    DrawRectangle(x + 1, y + 142, largura_perna + 4, 10, preto);
 
     // Tronco.
-    DrawRectangle(x - 38, y + 42, 76, 69, roupa);
-    DrawRectangle(x - 38, y + 91, 76, 12, sombra);
+    DrawRectangle(x - meia_largura, y + 40, meia_largura * 2, alto_tronco, roupa);
 
-    // Cabeça e rosto.
-    DrawCircle(x, y + 23, 25, pele);
-    DrawRectangle(x - 26, y + 12, 52, 9, (Color){60, 43, 34, 255});
-    DrawCircle(x - 9, y + 23, 2, BLACK);
-    DrawCircle(x + 9, y + 23, 2, BLACK);
-    DrawLine(x - 7, y + 34, x + 7, y + 34, (Color){95, 45, 38, 255});
+    if (numero_boss == 1) {
+        // Listras de uniforme de preso e o número no peito.
+        Color listra = (Color){roupa.r / 2, roupa.g / 2, roupa.b / 2, 255};
 
-    if (defendendo) {
-        // Guarda do chefe.
-        DrawLineEx(
-            (Vector2){(float)(x - 30), (float)(y + 61)},
-            (Vector2){(float)(x - 18), (float)(y + 39)},
-            15,
-            roupa
-        );
-        DrawLineEx(
-            (Vector2){(float)(x + 30), (float)(y + 61)},
-            (Vector2){(float)(x + 18), (float)(y + 39)},
-            15,
-            roupa
-        );
-        DrawCircle(x - 18, y + 38, 12, luva);
-        DrawCircle(x + 18, y + 38, 12, luva);
-    } else if (atacando) {
-        // Braço avançado na preparação do golpe.
-        // lado_ataque: -1 = golpe pela esquerda da tela, +1 = pela direita.
-        DrawLineEx(
-            (Vector2){(float)(x + lado_ataque * 27), (float)(y + 59)},
-            (Vector2){(float)(x + lado_ataque * 62), (float)(y + 68)},
-            16,
-            pele
-        );
-        DrawCircle(x + lado_ataque * 68, y + 68, 13, luva);
-        DrawLineEx(
-            (Vector2){(float)(x - lado_ataque * 28), (float)(y + 62)},
-            (Vector2){(float)(x - lado_ataque * 38), (float)(y + 82)},
-            14,
-            pele
-        );
-        DrawCircle(x - lado_ataque * 41, y + 86, 12, luva);
+        for (i = 0; i < 4; i++) {
+            DrawRectangle(x - meia_largura, y + 52 + i * 15, meia_largura * 2, 6, listra);
+        }
+
+        DrawRectangle(x + 10, y + 56, 30, 16, (Color){225, 220, 200, 255});
+        DrawText("214", x + 14, y + 59, 12, preto);
+    } else if (numero_boss == 2) {
+        // Casaco remendado, com botões e uma estrela vermelha.
+        DrawRectangle(x - 1, y + 40, 2, alto_tronco, preto);
+        DrawRectangle(x - 19, y + 76, 15, 14, (Color){90, 72, 58, 255});
+        DrawRectangleLines(x - 19, y + 76, 15, 14, preto);
+        desenhar_estrela(x + 11, y + 60, 8, vermelho);
     } else {
-        // Guarda neutra.
-        DrawLineEx(
-            (Vector2){(float)(x - 30), (float)(y + 61)},
-            (Vector2){(float)(x - 44), (float)(y + 84)},
-            14,
-            pele
-        );
-        DrawLineEx(
-            (Vector2){(float)(x + 30), (float)(y + 61)},
-            (Vector2){(float)(x + 44), (float)(y + 84)},
-            14,
-            pele
-        );
-        DrawCircle(x - 47, y + 88, 12, luva);
-        DrawCircle(x + 47, y + 88, 12, luva);
+        // Uniforme de guarda: ombreiras, botões e cinto.
+        DrawRectangle(x - meia_largura, y + 40, 20, 7, ouro);
+        DrawRectangle(x + meia_largura - 20, y + 40, 20, 7, ouro);
+        DrawRectangle(x - 2, y + 56, 4, 4, ouro);
+        DrawRectangle(x - 2, y + 72, 4, 4, ouro);
+        DrawRectangle(x - meia_largura, y + 92, meia_largura * 2, 9, preto);
+        DrawRectangle(x - 6, y + 92, 12, 9, ouro);
+    }
+
+    // Cabeça quadrada, olhos de um pixel só.
+    DrawRectangle(x - meia_cabeca, y + 2, meia_cabeca * 2, 40, pele);
+    DrawRectangle(x - meia_cabeca - 4, y + 16, 4, 12, pele);
+    DrawRectangle(x + meia_cabeca, y + 16, 4, 12, pele);
+    DrawRectangle(x - 2, y + 22, 4, 8, (Color){180, 140, 108, 255});
+    DrawRectangle(x - meia_cabeca / 2 - 2, y + 18, 5, 5, preto);
+    DrawRectangle(x + meia_cabeca / 2 - 3, y + 18, 5, 5, preto);
+    DrawRectangle(x - 6, y + 34, 12, 3, (Color){110, 50, 45, 255});
+
+    if (numero_boss != 2) {
+        // Sobrancelhas pesadas.
+        DrawRectangle(x - 15, y + 13, 12, 3, preto);
+        DrawRectangle(x + 3, y + 13, 12, 3, preto);
+    }
+
+    if (numero_boss == 1) {
+        // Cabeça raspada e barba por fazer.
+        DrawRectangle(x - meia_cabeca, y + 38, meia_cabeca * 2, 4, (Color){150, 118, 92, 255});
+        DrawRectangle(x - 12, y + 30, 24, 4, (Color){150, 118, 92, 255});
+    } else if (numero_boss == 2) {
+        // Cabelo bagunçado, faixa vermelha na testa e cavanhaque.
+        DrawRectangle(x - meia_cabeca, y + 2, meia_cabeca * 2, 7, cabelo);
+        DrawRectangle(x - meia_cabeca - 4, y + 6, 6, 14, cabelo);
+        DrawRectangle(x + meia_cabeca - 2, y + 6, 6, 14, cabelo);
+        DrawRectangle(x - meia_cabeca - 2, y + 11, meia_cabeca * 2 + 4, 6, vermelho);
+        DrawRectangle(x + meia_cabeca, y + 15, 5, 14, vermelho);
+        DrawRectangle(x - 5, y + 38, 10, 7, cabelo);
+    } else {
+        // Chapéu ushanka com estrela e bigode.
+        Color pelo_chapeu = (Color){70, 58, 50, 255};
+
+        DrawRectangle(x - meia_cabeca - 5, y - 8, meia_cabeca * 2 + 10, 20, pelo_chapeu);
+        DrawRectangle(x - meia_cabeca - 5, y + 10, 10, 22, pelo_chapeu);
+        DrawRectangle(x + meia_cabeca - 5, y + 10, 10, 22, pelo_chapeu);
+        desenhar_estrela(x, y + 2, 7, vermelho);
+        DrawRectangle(x - 11, y + 29, 22, 5, preto);
+    }
+
+    // Braços e luvas, em três poses: defesa, golpe e guarda neutra.
+    if (defendendo) {
+        desenhar_braco(x - ombro, y + 61, x - 18, y + 39, largura_braco + 1, manga);
+        desenhar_braco(x + ombro, y + 61, x + 18, y + 39, largura_braco + 1, manga);
+        DrawCircle(x - 18, y + 38, raio_luva, luva);
+        DrawCircle(x + 18, y + 38, raio_luva, luva);
+    } else if (atacando) {
+        // lado_ataque: -1 = golpe pela esquerda da tela, +1 = pela direita.
+        desenhar_braco(x + lado_ataque * (ombro - 3), y + 59,
+                       x + lado_ataque * (ombro + 32), y + 68, largura_braco, manga);
+        DrawCircle(x + lado_ataque * (ombro + 38), y + 68, raio_luva + 1, luva);
+        desenhar_braco(x - lado_ataque * (ombro - 2), y + 62,
+                       x - lado_ataque * (ombro + 8), y + 82, largura_braco - 1, manga);
+        DrawCircle(x - lado_ataque * (ombro + 11), y + 86, raio_luva, luva);
+    } else {
+        desenhar_braco(x - ombro, y + 61, x - ombro - 14, y + 84, largura_braco, manga);
+        desenhar_braco(x + ombro, y + 61, x + ombro + 14, y + 84, largura_braco, manga);
+        DrawCircle(x - ombro - 17, y + 88, raio_luva, luva);
+        DrawCircle(x + ombro + 17, y + 88, raio_luva, luva);
+    }
+
+    // Braçadeira vermelha do revolucionário, no ombro.
+    if (numero_boss == 2) {
+        DrawRectangle(x - ombro - 6, y + 56, 12, 8, vermelho);
     }
 }
 
@@ -1063,10 +1187,9 @@ int main(void) {
 
                 if (resultado == COMBATE_DERROTA) {
                     // Perdeu a luta de vez: gasta um continue.
-                    continues--;
-
-                    if (continues <= 0) {
-                        continues = 0;
+                    if (continues > 0) {
+                        continues--;
+                    } else {
                         tela = TELA_GAME_OVER;
                         placar_registro_agora(&novo_registro, pontuacao);
                     }
@@ -1451,6 +1574,7 @@ int main(void) {
             if (hp_boss > hp_maximo_boss) hp_boss = hp_maximo_boss;
 
             DrawText(boss.nome, 650, 77, 22, RED);
+            DrawText(PAPEIS_CHEFES[numero_boss - 1], 650, 58, 14, (Color){200, 190, 150, 255});
             DrawText(TextFormat("%d", boss.hp), 650, 105, 19, RAYWHITE);
             DrawRectangle(690, 111, 220, 17, DARKGRAY);
             DrawRectangle(
@@ -1465,22 +1589,18 @@ int main(void) {
                 (Color){190, 195, 205, 255}
             );
 
-            // Cores do chefe (a ursa Anastasia tem pelagem marrom).
+            // Cor da roupa (ou do pelo, no caso da ursa Anastasia).
             int ursa = (numero_boss == 4);
-            Color roupa_boss = ursa ? (Color){112, 74, 46, 255} : (Color){155, 45, 45, 255};
-
-            if (estado_boss == BOSS_PREPARANDO) {
-                roupa_boss = ursa ? (Color){165, 92, 44, 255} : (Color){205, 85, 40, 255};
-            } else if (estado_boss == BOSS_RECUPERANDO) {
-                roupa_boss = ursa ? (Color){82, 56, 40, 255} : (Color){115, 55, 55, 255};
-            }
-
-            // Sombras no piso para dar profundidade.
-            DrawEllipse(480, 386, 37, 9, (Color){15, 16, 18, 120});
-            DrawEllipse(480, 505, 92, 15, (Color){15, 16, 18, 150});
+            Color roupa_boss = cor_uniforme(numero_boss, estado_boss);
 
             // Chefe ao fundo, de frente para o jogador (gira ao cair).
             int topo_boss = ursa ? 140 : 157;
+
+            // Sombras no piso para dar profundidade.
+            int largura_sombra = ursa ? 66 : (numero_boss == 1 ? 56 : 42);
+            DrawEllipse(480, topo_boss + (ursa ? 173 : 153), largura_sombra, 9, (Color){15, 16, 18, 120});
+            DrawEllipse(480, 505, 92, 15, (Color){15, 16, 18, 150});
+
             int pivo_boss_y = topo_boss + (ursa ? 110 : 105);
             int boss_em_guarda = (!em_nocaute && estado_boss == BOSS_GUARDANDO);
             int boss_atacando = (!em_nocaute && estado_boss == BOSS_PREPARANDO);
@@ -1498,8 +1618,7 @@ int main(void) {
                 );
             } else {
                 desenhar_boss_de_frente(
-                    480, topo_boss, roupa_boss,
-                    (Color){218, 178, 132, 255},
+                    480, topo_boss, numero_boss, roupa_boss,
                     boss_atacando, boss_em_guarda, lado_boss
                 );
             }

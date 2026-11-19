@@ -23,6 +23,9 @@
 #define PONTOS_SOCO_CONTRA_ATAQUE 30   // soco com dano dobrado após esquiva perfeita
 #define PONTOS_ESQUIVA 25              // esquiva perfeita
 
+// ESTATISTICAS (matriz chefe x tipo de acao)
+#define NUM_CHEFES 4
+
 // NOCAUTE, JUIZ E REVIVER
 #define NOCAUTE_DURACAO_QUEDA 1.4f      // animação de queda
 #define NOCAUTE_DURACAO_JUIZ 1.0f       // juiz entrando em cena
