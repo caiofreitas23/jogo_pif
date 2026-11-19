@@ -134,23 +134,23 @@ static int carregar_placar_txt(const char *caminho, RegistroPlacar lista[], int 
 
     while (fgets(linha, sizeof(linha), arquivo) && total < max_itens) {
         int pos = 0;
-        RegistroPlacar reg = {0};
+        RegistroPlacar item = {0};
 
         if (sscanf(
                 linha,
                 " %d | %31[^|] | %d | %d/%*d | %d | %d | %d | %31[^\r\n]",
                 &pos,
-                reg.jogador,
-                ®.pontuacao,
-                ®.chefes_derrotados,
-                ®.golpes_acertados,
-                ®.esquivas_perfeitas,
-                ®.golpes_recebidos,
-                reg.resultado
+                item.jogador,
+                &item.pontuacao,
+                &item.chefes_derrotados,
+                &item.golpes_acertados,
+                &item.esquivas_perfeitas,
+                &item.golpes_recebidos,
+                item.resultado
             ) == 8) {
-            limpar_espacos(reg.jogador);
-            limpar_espacos(reg.resultado);
-            lista[total++] = reg;
+            limpar_espacos(item.jogador);
+            limpar_espacos(item.resultado);
+            lista[total++] = item;
         }
     }
 
@@ -996,7 +996,7 @@ int main(void) {
                     intervalo_ataque = calcular_intervalo_ataque(&boss);
 
                     memset(&placar_atual, 0, sizeof(placar_atual));
-                    snprintf(placar_atual.jogador, sizeof(placar_atual.jogador), "%s", jogador.nome);
+                    snprintf(placar_atual.jogador, sizeof(placar_atual.jogador), "%.31s", jogador.nome);
                     snprintf(placar_atual.resultado, sizeof(placar_atual.resultado), "EM CURSO");
                     indice_placar_salvo = -1;
                     posicao_ranking = sincronizar_placar_txt(ARQUIVO_PLACAR, &placar_atual, &indice_placar_salvo);
