@@ -107,6 +107,91 @@ static int obter_vida_maxima_boss(int numero_boss) {
     }
 }
 
+/*
+ * ---------- Sistema de colisão ----------
+ * Cada lutador tem uma hurtbox (região onde leva dano) e cada golpe tem uma
+ * hitbox (a luva). O golpe só acerta se a hitbox sobrepuser a hurtbox, usando
+ * CheckCollisionCircleRec da raylib. As caixas ficam no mesmo espaço (x/y de
+ * tela) em que os lutadores são desenhados.
+ */
+#define COLISAO_CENTRO_X 480.0f            // eixo central do ringue
+#define COLISAO_DESLOCAMENTO_ESQUIVA 35.0f // mesmo deslocamento do desenho
+
+#define COLISAO_JOGADOR_META_LARGURA 40.0f // tronco/cabeça do jogador
+#define COLISAO_JOGADOR_TOPO 295.0f
+#define COLISAO_JOGADOR_ALTURA 230.0f
+
+#define COLISAO_SOCO_CHEFE_DIST_X 60.0f    // luva do chefe a partir do centro
+#define COLISAO_SOCO_CHEFE_Y 380.0f
+#define COLISAO_SOCO_CHEFE_RAIO 35.0f
+
+#define COLISAO_SOCO_JOGADOR_DIST_X 25.0f  // luva do jogador a partir do centro
+#define COLISAO_SOCO_JOGADOR_Y 260.0f
+#define COLISAO_SOCO_JOGADOR_RAIO 22.0f
+
+// ESQUIVA_ESQUERDA -> -1, ESQUIVA_DIREITA -> +1, ESQUIVA_NENHUMA -> 0.
+static int direcao_esquiva_para_lado(DirecaoEsquiva direcao) {
+    if (direcao == ESQUIVA_ESQUERDA) return -1;
+    if (direcao == ESQUIVA_DIREITA) return 1;
+    return 0;
+}
+
+// Hurtbox do jogador: acompanha o deslocamento lateral da esquiva.
+static Rectangle hurtbox_jogador(int lado_esquiva) {
+    float x = COLISAO_CENTRO_X + lado_esquiva * COLISAO_DESLOCAMENTO_ESQUIVA;
+
+    return (Rectangle){
+        x - COLISAO_JOGADOR_META_LARGURA, COLISAO_JOGADOR_TOPO,
+        COLISAO_JOGADOR_META_LARGURA * 2.0f, COLISAO_JOGADOR_ALTURA
+    };
+}
+
+// Hurtbox do chefe: acompanha o tamanho do corpo de cada um.
+static Rectangle hurtbox_boss(int numero_boss) {
+    float topo = (numero_boss == 4) ? 140.0f : 157.0f;
+    float meia_largura;
+
+    switch (numero_boss) {
+        case 1: meia_largura = 54.0f; break;
+        case 2: meia_largura = 28.0f; break;
+        case 3: meia_largura = 44.0f; break;
+        default: meia_largura = 58.0f; break;
+    }
+
+    return (Rectangle){
+        COLISAO_CENTRO_X - meia_largura, topo + 2.0f, meia_largura * 2.0f, 150.0f
+    };
+}
+
+// Soco do chefe (lado -1 = esquerda, +1 = direita) contra a hurtbox do jogador.
+static int soco_boss_colide_jogador(int lado_ataque, int lado_esquiva) {
+    Vector2 luva = {
+        COLISAO_CENTRO_X + lado_ataque * COLISAO_SOCO_CHEFE_DIST_X,
+        COLISAO_SOCO_CHEFE_Y
+    };
+
+    return CheckCollisionCircleRec(
+        luva, COLISAO_SOCO_CHEFE_RAIO, hurtbox_jogador(lado_esquiva)
+    );
+}
+
+// Soco do jogador (J = luva esquerda, K = luva direita) contra a hurtbox do chefe.
+static int soco_jogador_colide_boss(int soco_esq, int soco_dir, int lado_esquiva, int numero_boss) {
+    float x = COLISAO_CENTRO_X + lado_esquiva * COLISAO_DESLOCAMENTO_ESQUIVA;
+    Rectangle alvo = hurtbox_boss(numero_boss);
+
+    if (soco_esq) {
+        Vector2 luva = {x - COLISAO_SOCO_JOGADOR_DIST_X, COLISAO_SOCO_JOGADOR_Y};
+        if (CheckCollisionCircleRec(luva, COLISAO_SOCO_JOGADOR_RAIO, alvo)) return 1;
+    }
+
+    if (soco_dir) {
+        Vector2 luva = {x + COLISAO_SOCO_JOGADOR_DIST_X, COLISAO_SOCO_JOGADOR_Y};
+        if (CheckCollisionCircleRec(luva, COLISAO_SOCO_JOGADOR_RAIO, alvo)) return 1;
+    }
+
+    return 0;
+}
 static void desenhar_texto_centralizado(const char *texto, int y, int tamanho, Color cor) {
     int largura = MeasureText(texto, tamanho);
     DrawText(texto, (LARGURA_TELA - largura) / 2, y, tamanho, cor);
