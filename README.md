@@ -28,6 +28,16 @@ Ao vencer os desafios, o jogador vencerá o jogo.
 |Navegar (menu)|setas|
 |Ok/Confirmar|Enter|
 
+## Funcionalidades do jogo
+* Janela gráfica 960×540 a 60 FPS desenvolvida em C com a biblioteca Raylib 
+* Troca de telas completa (MENU → TRANSIÇÃO → COMBATE → FINAL / GAME OVER → NOME → PLACAR)
+* 4 chefes progressivos com atributos, visuais e padrões próprios: Bobrovsky, Vladimir, Ivan e Anastasia 
+* Sistema de combate em tempo real dos chefes (guarda, preparação de golpe e recuperação)
+* Mecânicas de ataque (J/K), defesa (S), esquiva direcional (A/D) e contra-ataque com dano dobrado após esquiva perfeita
+* Sequência animada de nocaute com entrada do juiz, contagem regressiva e chance de levantar uma vez por luta
+* Matriz de estatísticas (4 × 3) que contabiliza socos, contra-ataques e esquivas por chefe
+* Ranking ordenado em lista encadeada com arquivo de texto
+
  
 
 
@@ -62,6 +72,9 @@ Jogo_Pif/
 |   └── recordes.txt               # Arquivo onde os recordes são salvos
 
 ```
+## Como executar o projeto
+
+
 
 ## Desenvolvimento
 
