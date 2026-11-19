@@ -2,7 +2,7 @@
 
 **Beyond the Fallen** é um jogo de ação e combate desenvolvido em C como projeto da matéria de Programação Imperativa e Funcional (PIF), da CESAR School. A aventura se passa em um gulag cercado pela neve, onde um prisioneiro precisa sobreviver aos confrontos, aprender habilidades e encontrar uma saída.
 
-> **Status:** conceito pronto e desenvolvimento quase completo.
+> **Status:** conceito pronto e desenvolvimento completo.
 
 ## História
 
@@ -138,7 +138,7 @@ gcc src/*.c -o jogo.exe -lraylib -lopengl32 -lgdi32 -lwinmm && .\jogo.exe
 
 ## Desenvolvimento
 
-Este projeto está na fase final de desenvolvimento.
+Este projeto está finalizado.
 
 ## Autoria
 
