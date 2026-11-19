@@ -11,7 +11,7 @@ void estat_zerar(Estatisticas *e) {
 }
 
 // soma 1 na acao feita contra o chefe (chefe vai de 1 a 4)
-void estat_registrar(Estatisticas *e, int chefe, int tipo) {
+void estatisticas_registrar(Estatisticas *e, int chefe, int tipo) {
     e->dados[chefe - 1][tipo]++;
 }
 
@@ -24,7 +24,7 @@ int estat_pontos_chefe(const Estatisticas *e, int chefe) {
          + linha[STAT_ESQUIVAS] * PONTOS_ESQUIVA;
 }
 
-int estat_pontuacao(const Estatisticas *e) {
+int estatisticas_pontuacao(const Estatisticas *e) {
     int total = 0;
     int i;
 

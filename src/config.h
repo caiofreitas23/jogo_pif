@@ -24,7 +24,7 @@
 #define PONTOS_ESQUIVA 25              // esquiva perfeita
 
 // ESTATISTICAS (matriz chefe x tipo de acao)
-#define NUM_CHEFES 4
+#define NUMERO_CHEFES 4
 
 // NOCAUTE, JUIZ E REVIVER
 #define NOCAUTE_DURACAO_QUEDA 1.4f      // animação de queda

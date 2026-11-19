@@ -8,7 +8,7 @@
 #include "config.h"
 
 #define ARQUIVO_PLACAR "placar.txt"
-#define MAX_REGISTROS_PLACAR 10
+#define MAXIMO_REGISTROS_PLACAR 10
 
 typedef enum {
     TELA_MENU,
@@ -214,19 +214,19 @@ static void gravar_placar_txt(const char *caminho, const RegistroPlacar lista[],
 
 /*
  * Atualiza a entrada da partida atual no ranking, ordena e grava em placar.txt.
- * Retorna a posição atual do jogador no ranking (1..MAX_REGISTROS_PLACAR).
+ * Retorna a posição atual do jogador no ranking (1..MAXIMO_REGISTROS_PLACAR).
  */
 static int sincronizar_placar_txt(
     const char *caminho,
     const RegistroPlacar *partida_atual,
     int *indice_salvo
 ) {
-    RegistroPlacar lista[MAX_REGISTROS_PLACAR + 1];
-    int total = carregar_placar_txt(caminho, lista, MAX_REGISTROS_PLACAR);
+    RegistroPlacar lista[MAXIMO_REGISTROS_PLACAR + 1];
+    int total = carregar_placar_txt(caminho, lista, MAXIMO_REGISTROS_PLACAR);
 
     if (*indice_salvo >= 0 && *indice_salvo < total) {
         lista[*indice_salvo] = *partida_atual;
-    } else if (total < MAX_REGISTROS_PLACAR) {
+    } else if (total < MAXIMO_REGISTROS_PLACAR) {
         *indice_salvo = total;
         lista[total++] = *partida_atual;
     } else {
@@ -235,8 +235,8 @@ static int sincronizar_placar_txt(
     }
 
     ordenar_placar(lista, total);
-    if (total > MAX_REGISTROS_PLACAR) {
-        total = MAX_REGISTROS_PLACAR;
+    if (total > MAXIMO_REGISTROS_PLACAR) {
+        total = MAXIMO_REGISTROS_PLACAR;
     }
 
     int posicao = 1;

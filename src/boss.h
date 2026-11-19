@@ -9,7 +9,7 @@ typedef struct {
     int id;
     float x, y;
     int vida;
-    int anim_frame;
+    int animacao_frame;
     float timer;
 } Boss;
 
