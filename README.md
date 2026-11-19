@@ -23,7 +23,7 @@ Ao vencer os desafios, o jogador vencerá o jogo.
 |Ação |Botão|
 |:---:|:---:|
 |Ataque|J/K|
-|Defesa|W|
+|Defesa|S|
 |Esquiva|A/D|
 |Navegar (menu)|setas|
 |Ok/Confirmar|Enter|
