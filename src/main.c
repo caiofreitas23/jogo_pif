@@ -599,6 +599,7 @@ static void desenhar_boss_de_frente(
         DrawCircle(x + 47, y + 88, 12, luva);
     }
 }
+
 static void desenhar_arena(void) {
     Color parede = (Color){35, 38, 44, 255};
     Color piso_fundo = (Color){77, 72, 67, 255};
@@ -658,248 +659,14 @@ static void desenhar_arena(void) {
     );
 }
 
-
-static unsigned char clarear_canal(unsigned char v) {
-    int r = v + 45;
-    return (unsigned char)(r > 255 ? 255 : r);
-}
-
-// Três garras apontadas para baixo, a partir do centro da pata.
-static void desenhar_garras(int px, int py) {
-    Color garra = (Color){235, 230, 215, 255};
-    int k;
-
-    for (k = -1; k <= 1; k++) {
-        DrawLineEx(
-            (Vector2){(float)(px + k * 7), (float)(py + 7)},
-            (Vector2){(float)(px + k * 9), (float)(py + 21)},
-            3, garra
-        );
-    }
-}
-
-/*
- * Anastasia: uma ursa de pé, vista de frente, no mesmo ponto de vista dos
- * outros chefes. Mesma lógica de poses: guarda, preparando golpe e defesa.
- */
-static void desenhar_urso_de_frente(
-    int centro_x,
-    int topo_y,
-    Color pelo,
-    int atacando,
-    int defendendo,
-    int lado_ataque
-) {
-    int x = centro_x;
-    int y = topo_y;
-
-    Color escuro = (Color){
-        (unsigned char)(pelo.r * 0.7f),
-        (unsigned char)(pelo.g * 0.7f),
-        (unsigned char)(pelo.b * 0.7f),
-        255
-    };
-    Color claro = (Color){
-        clarear_canal(pelo.r), clarear_canal(pelo.g), clarear_canal(pelo.b), 255
-    };
-    Color focinho = (Color){201, 165, 125, 255};
-    Color almofada = (Color){70, 40, 40, 255};
-
-    // Patas traseiras.
-    DrawEllipse(x - 30, y + 158, 26, 15, escuro);
-    DrawEllipse(x + 30, y + 158, 26, 15, escuro);
-    DrawEllipse(x - 30, y + 162, 13, 7, almofada);
-    DrawEllipse(x + 30, y + 162, 13, 7, almofada);
-
-    // Corpo e barriga.
-    DrawEllipse(x, y + 105, 58, 64, pelo);
-    DrawEllipse(x, y + 114, 35, 44, claro);
-
-    // Braços e patas dianteiras.
-    if (defendendo) {
-        DrawLineEx((Vector2){(float)(x - 48), (float)(y + 80)},
-                   (Vector2){(float)(x - 26), (float)(y + 54)}, 26, pelo);
-        DrawLineEx((Vector2){(float)(x + 48), (float)(y + 80)},
-                   (Vector2){(float)(x + 26), (float)(y + 54)}, 26, pelo);
-        DrawCircle(x - 24, y + 50, 16, escuro);
-        DrawCircle(x + 24, y + 50, 16, escuro);
-        desenhar_garras(x - 24, y + 50);
-        desenhar_garras(x + 24, y + 50);
-    } else if (atacando) {
-        // lado_ataque: -1 = golpe pela esquerda da tela, +1 = pela direita.
-        DrawLineEx((Vector2){(float)(x + lado_ataque * 46), (float)(y + 76)},
-                   (Vector2){(float)(x + lado_ataque * 92), (float)(y + 52)}, 26, pelo);
-        DrawCircle(x + lado_ataque * 97, y + 49, 17, escuro);
-        desenhar_garras(x + lado_ataque * 97, y + 49);
-
-        DrawLineEx((Vector2){(float)(x - lado_ataque * 46), (float)(y + 80)},
-                   (Vector2){(float)(x - lado_ataque * 60), (float)(y + 120)}, 24, pelo);
-        DrawCircle(x - lado_ataque * 62, y + 125, 15, escuro);
-        desenhar_garras(x - lado_ataque * 62, y + 125);
-    } else {
-        DrawLineEx((Vector2){(float)(x - 50), (float)(y + 78)},
-                   (Vector2){(float)(x - 67), (float)(y + 124)}, 25, pelo);
-        DrawLineEx((Vector2){(float)(x + 50), (float)(y + 78)},
-                   (Vector2){(float)(x + 67), (float)(y + 124)}, 25, pelo);
-        DrawCircle(x - 69, y + 129, 15, escuro);
-        DrawCircle(x + 69, y + 129, 15, escuro);
-        desenhar_garras(x - 69, y + 129);
-        desenhar_garras(x + 69, y + 129);
-    }
-
-    // Orelhas, cabeça e focinho.
-    DrawCircle(x - 25, y + 15, 12, pelo);
-    DrawCircle(x + 25, y + 15, 12, pelo);
-    DrawCircle(x - 25, y + 15, 6, almofada);
-    DrawCircle(x + 25, y + 15, 6, almofada);
-
-    DrawCircle(x, y + 40, 32, pelo);
-    DrawEllipse(x, y + 52, 16, 12, focinho);
-    DrawEllipse(x, y + 47, 6, 4, BLACK);
-    DrawLineEx((Vector2){(float)x, (float)(y + 51)},
-               (Vector2){(float)x, (float)(y + 58)}, 2, BLACK);
-    DrawLineEx((Vector2){(float)(x - 7), (float)(y + 60)},
-               (Vector2){(float)x, (float)(y + 58)}, 2, BLACK);
-    DrawLineEx((Vector2){(float)(x + 7), (float)(y + 60)},
-               (Vector2){(float)x, (float)(y + 58)}, 2, BLACK);
-
-    // Olhos com sobrancelhas franzidas.
-    DrawCircle(x - 12, y + 35, 3, BLACK);
-    DrawCircle(x + 12, y + 35, 3, BLACK);
-    DrawLineEx((Vector2){(float)(x - 19), (float)(y + 27)},
-               (Vector2){(float)(x - 7), (float)(y + 31)}, 3, escuro);
-    DrawLineEx((Vector2){(float)(x + 19), (float)(y + 27)},
-               (Vector2){(float)(x + 7), (float)(y + 31)}, 3, escuro);
-}
-
-/*
- * Juiz de camisa listrada. (x, y_pe) é o ponto dos pés; "ritmo" balança as
- * pernas enquanto ele anda (0 = parado); braco_levantado marca a contagem.
- */
-static void desenhar_juiz(float x, float y_pe, float escala, float ritmo, int braco_levantado) {
-    Color camisa = (Color){236, 236, 236, 255};
-    Color listra = (Color){22, 22, 26, 255};
-    Color calca = (Color){26, 26, 32, 255};
-    Color pele = (Color){218, 178, 132, 255};
-    int passo = (ritmo > 0) ? (int)(sinf(ritmo * 14.0f) * 6.0f) : 0;
-    int k;
-
-    rlPushMatrix();
-    rlTranslatef(x, y_pe, 0.0f);
-    rlScalef(escala, escala, 1.0f);
-
-    // Pernas e sapatos.
-    DrawRectangle(-16 + passo, -60, 13, 60, calca);
-    DrawRectangle(3 - passo, -60, 13, 60, calca);
-    DrawRectangle(-19 + passo, -8, 19, 8, BLACK);
-    DrawRectangle(1 - passo, -8, 19, 8, BLACK);
-
-    // Tronco listrado.
-    DrawRectangle(-26, -124, 52, 66, camisa);
-    for (k = 0; k < 5; k++) {
-        DrawRectangle(-22 + k * 10, -124, 4, 66, listra);
-    }
-
-    // Braços: o direito marca a contagem.
-    DrawLineEx((Vector2){-26.0f, -116.0f}, (Vector2){-35.0f, -70.0f}, 12, camisa);
-    DrawCircle(-36, -66, 7, pele);
-
-    if (braco_levantado) {
-        DrawLineEx((Vector2){26.0f, -116.0f}, (Vector2){46.0f, -170.0f}, 12, camisa);
-        DrawCircle(47, -175, 8, pele);
-    } else {
-        DrawLineEx((Vector2){26.0f, -116.0f}, (Vector2){50.0f, -128.0f}, 12, camisa);
-        DrawCircle(53, -130, 8, pele);
-    }
-
-    // Cabeça, cabelo e gravata-borboleta.
-    DrawCircle(0, -142, 18, pele);
-    DrawRectangle(-18, -160, 36, 9, (Color){40, 30, 24, 255});
-    DrawRectangle(-9, -124, 18, 6, (Color){190, 35, 35, 255});
-
-    rlPopMatrix();
-}
-
-// Pequenas estrelas girando sobre a cabeça de quem foi nocauteado.
-static void desenhar_estrelas(float cx, float cy, float raio) {
-    float t = (float)GetTime();
-    int i;
-
-    for (i = 0; i < 3; i++) {
-        float a = t * 4.0f + i * 2.094f;
-        Vector2 centro = {
-            cx + cosf(a) * raio,
-            cy - raio * 0.8f + sinf(a) * raio * 0.35f
-        };
-        DrawPoly(centro, 4, raio * 0.16f + 3.0f, t * 120.0f, (Color){255, 220, 60, 255});
-    }
-}
-
-// Ângulo (0 a 90) da queda, conforme a fase do nocaute.
-static float angulo_nocaute(FaseKO fase, float tempo_ko) {
-    float u;
-
-    switch (fase) {
-        case KO_QUEDA:
-            u = tempo_ko / NOCAUTE_DURACAO_QUEDA;
-            if (u > 1.0f) u = 1.0f;
-            return 90.0f * u * u;
-        case KO_LEVANTA:
-            u = tempo_ko / NOCAUTE_DURACAO_LEVANTAR;
-            if (u > 1.0f) u = 1.0f;
-            return 90.0f * (1.0f - u);
-        case KO_NENHUM:
-            return 0.0f;
-        default:
-            return 90.0f;
-    }
-}
-
-// Juiz e contagem acima da cabeça dele (jogador: tamanho grande; chefe: pequeno ao fundo).
-static void desenhar_juiz_nocaute(AlvoKO alvo, FaseKO fase, float tempo_ko) {
-    int alvo_boss = (alvo == KO_ALVO_BOSS);
-    float escala = alvo_boss ? 0.55f : 1.0f;
-    float x_final = alvo_boss ? 600.0f : 660.0f;
-    float y_pe = alvo_boss ? 318.0f : 515.0f;
-    float x = x_final;
-    float ritmo = 0.0f;
-    int braco = 0;
-
-    if (fase == KO_QUEDA || fase == KO_NENHUM) {
-        return;
-    }
-
-    if (fase == KO_JUIZ_ENTRA) {
-        float u = tempo_ko / NOCAUTE_DURACAO_JUIZ;
-        float inicio = (float)LARGURA_TELA + 60.0f;
-
-        if (u > 1.0f) u = 1.0f;
-        u = 1.0f - (1.0f - u) * (1.0f - u);
-        x = inicio + (x_final - inicio) * u;
-        ritmo = (float)GetTime();
-    }
-
-    if (fase == KO_CONTAGEM) {
-        braco = (tempo_ko - (int)tempo_ko) < 0.5f;
-    }
-
-    desenhar_juiz(x, y_pe, escala, ritmo, braco);
-
-    if (fase == KO_CONTAGEM) {
-        int limite = alvo_boss ? NOCAUTE_CONTAGEM_BOSS : NOCAUTE_CONTAGEM_JOGADOR;
-        int n = (int)tempo_ko + 1;
-        int tamanho = alvo_boss ? 44 : 64;
-        int y_texto = (int)(y_pe - 160.0f * escala) - tamanho - 12;
-        const char *texto;
-        int largura;
-
-        if (n > limite) n = limite;
-        texto = TextFormat("%d", n);
-        largura = MeasureText(texto, tamanho);
-
-        DrawText(texto, (int)x - largura / 2 + 2, y_texto + 2, tamanho, BLACK);
-        DrawText(texto, (int)x - largura / 2, y_texto, tamanho, (Color){255, 205, 55, 255});
-    }
+static void preparar_lutadores_para_luta(Player *jogador, Boss *boss, int numero_boss) {
+    iniciar_boss(boss, numero_boss);
+    jogador->hp = PLAYER_VIDA;
+    jogador->dano = PLAYER_DANO_BASE;
+    jogador->defendendo = 0;
+    jogador->esquivando = 0;
+    jogador->cooldown_defesa = 0;
+    jogador->cooldown_esquiva = 0;
 }
 
 static void reiniciar_combate(
@@ -937,12 +704,9 @@ static void reiniciar_combate(
     *resultado = COMBATE_EM_ANDAMENTO;
 }
 
-
 static void desenhar_menu(int opcao) {
     Color normal = (Color){190, 195, 205, 255};
     Color destaque = (Color){255, 205, 55, 255};
-    const char *rotulos[MENU_TOTAL] = {"COMEÇAR", "PLACAR", "SAIR"};
-    int i;
 
     desenhar_arena();
     DrawRectangle(0, 0, LARGURA_TELA, ALTURA_TELA, (Color){0, 0, 0, 170});
@@ -950,12 +714,14 @@ static void desenhar_menu(int opcao) {
     desenhar_texto_centralizado("BEYOND THE FALLEN", 110, 64, RAYWHITE);
     desenhar_texto_centralizado("Sobreviva ao gulag. Derrube os chefes.", 195, 22, normal);
 
-    for (i = 0; i < MENU_TOTAL; i++) {
-        desenhar_texto_centralizado(
-            i == opcao ? TextFormat("> %s <", rotulos[i]) : rotulos[i],
-            265 + i * 55, 34, i == opcao ? destaque : normal
-        );
-    }
+    desenhar_texto_centralizado(
+        opcao == 0 ? "> COMEÇAR <" : "COMEÇAR",
+        285, 34, opcao == 0 ? destaque : normal
+    );
+    desenhar_texto_centralizado(
+        opcao == 1 ? "> SAIR <" : "SAIR",
+        345, 34, opcao == 1 ? destaque : normal
+    );
 
     desenhar_texto_centralizado("W/S ou SETAS: escolher    ENTER: confirmar", 460, 18, normal);
     desenhar_texto_centralizado(
@@ -963,201 +729,9 @@ static void desenhar_menu(int opcao) {
     );
 }
 
-// Tabela da matriz de estatísticas: uma linha por chefe.
-static void desenhar_resumo(const Estatisticas *est, int y) {
-    static const char *nomes[NUM_CHEFES] = {"Bobrovsky", "Vladimir", "Ivan", "Anastasia"};
-    Color cinza = (Color){190, 195, 205, 255};
-    Color apagado = (Color){100, 105, 115, 255};
-    int i;
-
-    DrawText("CHEFE", 150, y, 18, cinza);
-    DrawText("SOCOS", 330, y, 18, cinza);
-    DrawText("CONTRA-ATAQUES", 430, y, 18, cinza);
-    DrawText("ESQUIVAS", 640, y, 18, cinza);
-    DrawText("PONTOS", 770, y, 18, cinza);
-    DrawLine(140, y + 24, 840, y + 24, apagado);
-
-    for (i = 0; i < NUM_CHEFES; i++) {
-        int linha_y = y + 32 + i * 26;
-        int pontos = estat_pontos_chefe(est, i + 1);
-        Color cor = (pontos > 0) ? RAYWHITE : apagado;
-
-        DrawText(nomes[i], 150, linha_y, 20, cor);
-        DrawText(TextFormat("%d", est->dados[i][STAT_SOCOS]), 330, linha_y, 20, cor);
-        DrawText(TextFormat("%d", est->dados[i][STAT_CONTRA_ATAQUES]), 430, linha_y, 20, cor);
-        DrawText(TextFormat("%d", est->dados[i][STAT_ESQUIVAS]), 640, linha_y, 20, cor);
-        DrawText(TextFormat("%d", pontos), 770, linha_y, 20, cor);
-    }
-}
-
-static void desenhar_game_over(int pontuacao, const Estatisticas *est) {
-    ClearBackground((Color){22, 24, 29, 255});
-
-    desenhar_texto_centralizado("GAME OVER", 35, 64, RED);
-    desenhar_texto_centralizado("Você perdeu todos os continues.", 112, 22, RAYWHITE);
-    desenhar_texto_centralizado(
-        TextFormat("PONTUAÇÃO: %d", pontuacao), 150, 30, (Color){255, 205, 55, 255}
-    );
-    desenhar_resumo(est, 215);
-    desenhar_texto_centralizado("ENTER: REGISTRAR PONTUAÇÃO", 440, 22, RAYWHITE);
-}
-
-static void abrir_placar(EstadoPlacar *ep) {
-    placar_carregar(&ep->placar);
-    ep->destaque = -1;
-    ep->pontos_fora = -1;
-    ep->opcao = 0;
-    ep->confirmar_apagar = 0;
-}
-
-// Fim de partida: pede o nome se a pontuação entra no placar; senão, mostra o placar.
-static Tela abrir_fim_de_partida(EstadoPlacar *ep, int pontos) {
-    abrir_placar(ep);
-    ep->nome[0] = '\0';
-    ep->tam_nome = 0;
-
-    if (placar_qualifica(&ep->placar, pontos)) {
-        // Descarta teclas digitadas nas telas anteriores (ex.: o "G" de desistir).
-        while (GetCharPressed() > 0) {
-        }
-        return TELA_NOME;
-    }
-
-    ep->pontos_fora = pontos;
-    return TELA_PLACAR;
-}
-
-static Rectangle retangulo_botao_placar(int indice) {
-    if (indice == 0) {
-        return (Rectangle){190, 462, 220, 46};
-    }
-
-    return (Rectangle){430, 462, 340, 46};
-}
-
-static void desenhar_botao(Rectangle r, const char *texto, int selecionado) {
-    Color dourado = (Color){255, 205, 55, 255};
-    int largura = MeasureText(texto, 22);
-
-    DrawRectangleRec(
-        r, selecionado ? (Color){70, 58, 20, 235} : (Color){30, 32, 38, 235}
-    );
-    DrawRectangleLinesEx(r, 2, selecionado ? dourado : (Color){110, 115, 125, 255});
-    DrawText(
-        texto,
-        (int)(r.x + (r.width - largura) / 2),
-        (int)(r.y + (r.height - 22) / 2),
-        22,
-        selecionado ? dourado : (Color){190, 195, 205, 255}
-    );
-}
-
-static void desenhar_placar(const EstadoPlacar *ep) {
-    Color cinza = (Color){190, 195, 205, 255};
-    Color dourado = (Color){255, 205, 55, 255};
-    int i;
-
-    desenhar_arena();
-    DrawRectangle(0, 0, LARGURA_TELA, ALTURA_TELA, (Color){0, 0, 0, 205});
-
-    desenhar_texto_centralizado("PLACAR", 24, 48, RAYWHITE);
-
-    DrawText("POS", 140, 100, 18, cinza);
-    DrawText("NOME", 230, 100, 18, cinza);
-    DrawText("PONTOS", 340, 100, 18, cinza);
-    DrawText("DATA E HORA", 520, 100, 18, cinza);
-    DrawLine(120, 124, 840, 124, (Color){110, 115, 125, 255});
-
-    if (ep->placar.quantidade == 0) {
-        desenhar_texto_centralizado("Nenhum recorde ainda.", 250, 24, cinza);
-    }
-
-    i = 0;
-    for (const NoPlacar *no = ep->placar.inicio; no != NULL; no = no->proximo, i++) {
-        const Registro *r = &no->registro;
-        int y = 134 + i * 28;
-        Color cor = (i == ep->destaque) ? dourado : RAYWHITE;
-
-        if (i == ep->destaque) {
-            DrawRectangle(120, y - 4, 720, 28, (Color){255, 205, 55, 45});
-        }
-
-        DrawText(TextFormat("%2d.", i + 1), 140, y, 20, cor);
-        DrawText(r->nome, 230, y, 20, cor);
-        DrawText(TextFormat("%d", r->pontos), 340, y, 20, cor);
-        DrawText(
-            TextFormat("%02d/%02d/%04d  %02d:%02d",
-                       r->dia, r->mes, r->ano, r->hora, r->minuto),
-            520, y, 20, cor
-        );
-    }
-
-    if (ep->pontos_fora >= 0) {
-        desenhar_texto_centralizado(
-            TextFormat("Sua pontuação (%d) não entrou no top %d.",
-                       ep->pontos_fora, PLACAR_MAX_REGISTROS),
-            424, 18, cinza
-        );
-    }
-
-    desenhar_botao(retangulo_botao_placar(0), "VOLTAR", ep->opcao == 0);
-    desenhar_botao(
-        retangulo_botao_placar(1),
-        ep->confirmar_apagar ? "CONFIRMAR: APAGAR TUDO" : "APAGAR RECORDES",
-        ep->opcao == 1
-    );
-
-    desenhar_texto_centralizado(
-        "A/D ou SETAS: escolher    ENTER ou mouse: confirmar",
-        516, 14, (Color){120, 125, 135, 255}
-    );
-}
-
-static void desenhar_tela_nome(const EstadoPlacar *ep, const Registro *r) {
-    Color cinza = (Color){190, 195, 205, 255};
-    Color dourado = (Color){255, 205, 55, 255};
-    int i;
-    int largura_caixa = 70;
-    int espaco = 20;
-    int x0 = (LARGURA_TELA - (3 * largura_caixa + 2 * espaco)) / 2;
-
-    ClearBackground((Color){22, 24, 29, 255});
-
-    desenhar_texto_centralizado("NOVO RECORDE!", 55, 52, dourado);
-    desenhar_texto_centralizado(TextFormat("PONTUAÇÃO: %d", r->pontos), 135, 32, RAYWHITE);
-    desenhar_texto_centralizado(
-        TextFormat("Partida encerrada em %02d/%02d/%04d às %02d:%02d",
-                   r->dia, r->mes, r->ano, r->hora, r->minuto),
-        185, 20, cinza
-    );
-    desenhar_texto_centralizado("DIGITE 3 LETRAS PARA O PLACAR", 250, 22, RAYWHITE);
-
-    for (i = 0; i < PLACAR_TAM_NOME; i++) {
-        Rectangle caixa = {(float)(x0 + i * (largura_caixa + espaco)), 295, (float)largura_caixa, 90};
-        int ativa = (i == ep->tam_nome);
-
-        DrawRectangleRec(caixa, (Color){30, 32, 38, 255});
-        DrawRectangleLinesEx(caixa, 3, ativa ? dourado : (Color){110, 115, 125, 255});
-
-        if (i < ep->tam_nome) {
-            char letra[2] = {ep->nome[i], '\0'};
-            int w = MeasureText(letra, 60);
-            DrawText(letra, (int)(caixa.x + (caixa.width - w) / 2), 310, 60, RAYWHITE);
-        } else if (ativa && ((int)(GetTime() * 2.0) % 2 == 0)) {
-            DrawRectangle((int)caixa.x + 15, 360, 40, 5, dourado);
-        }
-    }
-
-    desenhar_texto_centralizado(
-        ep->tam_nome == PLACAR_TAM_NOME ? "ENTER: CONFIRMAR" : "Faltam letras para confirmar",
-        425, 22, ep->tam_nome == PLACAR_TAM_NOME ? dourado : cinza
-    );
-    desenhar_texto_centralizado("BACKSPACE: apagar a última letra", 465, 18, cinza);
-}
-
 /*
- * Transição entre o menu e a primeira luta: contagem regressiva de
- * TEMPO_TRANSICAO segundos, com fade-in no início e fade-out no final.
+ * Tela de transição exibida antes da 1ª luta (10s) e entre cada luta (5s).
+ * Mostra o desenho de cada lutador da vez e todos os seus status.
  */
 static void desenhar_transicao(
     float restante,
