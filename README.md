@@ -70,5 +70,7 @@ Este projeto está na fase final de desenvolvimento.
 ## Autoria
 
 Caio Freitas de Andrade Medeiros
+
 João Pedro Guedes Alcoforado Carneiro Leão
+
 Gabriel Furtado Corrêa Miller
