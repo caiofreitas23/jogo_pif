@@ -10,8 +10,6 @@ Você é um prisioneiro soviético em um gulag. Para conquistar a liberdade, ter
 
 Será que você conseguirá enfrentar os duros desafios que a gulag apresenta? E que surpresas o confronto final pode te apresentar?
 
-## Progressão e chefes
-
 A campanha apresenta confrontos contra chefes com características e padrões de combate próprios. Entre os adversários planejados estão:
 
 - **Bobrovsky** — corpulento, preso por trair a pátria. Sua força e seu tamanho fazem dele um adversário difícil de derrubar.
@@ -21,23 +19,19 @@ A campanha apresenta confrontos contra chefes com características e padrões de
 
 Ao vencer os desafios, o jogador vencerá o jogo.
 
-## Mundo e cenários
+## Controles
+|Ação |Botão|
+|:---:|:---:|
+|Ataque|J/K|
+|Defesa|W|
+|Esquiva|A/D|
+|Navegar (menu)|setas|
+|Ok/Confirmar|Enter|
 
-O gulag funciona como um sistema de lutas com chefes diferenciados. 
-
-- Cenários ao fundo das batalhas.
+ 
 
 
 A direção visual proposta é simples e fria, com neve, pedra e estruturas austeras. A batalha final terá uma arena de pedra marcada por tremores, reforçando a força do confronto.
-
-## Combate
-
-O sistema de combate foi pensado para ser direto e acessível, com opções como:
-
-- Atacar;
-- Esquivar;
-- Defender;
-- Pular.
 
 Cada chefe exige atenção aos seus movimentos e ao momento certo para atacar ou se defender.
 
@@ -54,10 +48,27 @@ Cada chefe exige atenção aos seus movimentos e ao momento certo para atacar ou
 
 - **Linguagem:** C
 
+## Estrutura do projeto
+```
+Jogo_Pif/
+├── /src                           # Todos os arquivos principais do projeto
+│   ├── boss.c/h                   # Chefões
+│   ├── combat.c/h                 # Mecânicas da gameplay
+│   ├── config.h                   # Todas as configurações do jogo
+│   ├── estatisticas.c/h           # Tela de estatísticas gerais
+|   ├── main.c                     # Estrutura principal do codigo e esqueleto do jogo
+|   ├── placar.c/h                 # Tela de ranking de pontuação
+|   ├── player.c/h                 # Configurações do jogador
+|   └── recordes.txt               # Arquivo onde os recordes são salvos
+
+```
+
 ## Desenvolvimento
 
-Este projeto está em desenvolvimento. A quantidade de chefes, as habilidades, os itens, os controles e os detalhes da história podem ser ajustados ao longo da criação do jogo.
+Este projeto está na fase final de desenvolvimento.
 
 ## Autoria
 
-Projeto desenvolvido para a matéria de PIF da CESAR School.
+Caio Freitas de Andrade Medeiros
+João Pedro Guedes Alcoforado Carneiro Leão
+Gabriel Furtado Corrêa Miller
