@@ -74,6 +74,60 @@ Jogo_Pif/
 ```
 ## Como executar o projeto
 
+### Pré-requisitos
+
+- GCC ou Clang
+- Raylib instalada
+- `pkg-config` (Linux e macOS)
+
+Clone o repositório e entre na pasta do projeto:
+
+```bash
+git clone https://github.com/caiofreitas23/jogo_pif.git
+cd jogo_pif
+```
+
+Execute os comandos a partir da pasta `jogo_pif`, pois o jogo pode acessar arquivos usando caminhos relativos.
+
+### Linux (Ubuntu/Debian)
+
+Instale o compilador, o `pkg-config` e a Raylib. Em distribuições que disponibilizam o pacote, você pode usar:
+
+```bash
+sudo apt install build-essential pkg-config libraylib-dev
+```
+
+Compile e execute:
+
+```bash
+gcc -Wall -Wextra -Isrc src/*.c -o jogo $(pkg-config --cflags --libs raylib)
+./jogo
+```
+
+### macOS
+
+Instale a Raylib e o `pkg-config`:
+
+```bash
+brew install raylib pkg-config
+```
+
+Compile e execute:
+
+```bash
+gcc -Wall -Wextra -Isrc src/*.c -o jogo $(pkg-config --cflags --libs raylib)
+./jogo
+```
+
+### Windows
+
+Instale o GCC (por exemplo, pelo MinGW-w64) e a Raylib. Se a Raylib estiver em `C:\raylib`, compile e execute no terminal, a partir da pasta do projeto:
+
+```bash
+gcc -Wall -Wextra -Isrc src/*.c -o jogo.exe -I"C:\raylib\include" -L"C:\raylib\lib" -lraylib -lopengl32 -lgdi32 -lwinmm
+.\jogo.exe
+```
+
 
 
 ## Desenvolvimento
