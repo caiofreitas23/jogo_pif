@@ -3,7 +3,7 @@
 void estat_zerar(Estatisticas *e) {
     int i, j;
 
-    for (i = 0; i < NUM_CHEFES; i++) {
+    for (i = 0; i < NUMERO_CHEFES; i++) {
         for (j = 0; j < STAT_TOTAL; j++) {
             e->dados[i][j] = 0;
         }
@@ -28,7 +28,7 @@ int estatisticas_pontuacao(const Estatisticas *e) {
     int total = 0;
     int i;
 
-    for (i = 1; i <= NUM_CHEFES; i++) {
+    for (i = 1; i <= NUMERO_CHEFES; i++) {
         total += estat_pontos_chefe(e, i);
     }
 
