@@ -788,29 +788,28 @@ static void reiniciar_combate(
     float *tempo_soco,
     float *tempo_recuperacao_soco,
     float *tempo_contra_ataque,
+    float *tempo_esquiva,
     int *quantidade_ataques,
     int *soco_esquerdo,
     int *soco_direito,
+    int *soco_jogador_conectou,
+    int *golpe_boss_conectou,
     int *esquiva_perfeita,
     int *resultado
 ) {
-    iniciar_boss(boss, numero_boss);
-
-    jogador->hp = PLAYER_VIDA;
-    jogador->dano = PLAYER_DANO_BASE;
-    jogador->defendendo = 0;
-    jogador->esquivando = 0;
-    jogador->cooldown_defesa = 0;
-    jogador->cooldown_esquiva = 0;
+    preparar_lutadores_para_luta(jogador, boss, numero_boss);
 
     *estado_boss = BOSS_GUARDANDO;
     *tempo_estado = 0;
     *tempo_soco = 0;
     *tempo_recuperacao_soco = 0;
     *tempo_contra_ataque = 0;
+    *tempo_esquiva = 0;
     *quantidade_ataques = 0;
     *soco_esquerdo = 0;
     *soco_direito = 0;
+    *soco_jogador_conectou = 0;
+    *golpe_boss_conectou = 0;
     *esquiva_perfeita = 0;
     *resultado = COMBATE_EM_ANDAMENTO;
 }
@@ -1099,16 +1098,27 @@ int main(void) {
     float tempo_soco = 0;
     float tempo_recuperacao_soco = 0;
     float tempo_contra_ataque = 0;
+    float tempo_esquiva = 0;
     float intervalo_ataque = 2.0f;
 
     const float duracao_preparacao = 0.9f;
+    const float duracao_ataque_boss = 0.25f;
     const float duracao_recuperacao = 1.5f;
+    const float duracao_esquiva = 0.75f;
 
     int soco_esquerdo = 0;
     int soco_direito = 0;
+    int soco_jogador_conectou = 0;
+    int golpe_boss_conectou = 0;
+    int mostrar_hitboxes = 0;
+
+    // Feedback visual de colisão.
+    char texto_feedback[40] = "";
+    Color cor_feedback = RAYWHITE;
+    float tempo_feedback = 0.0f;
 
     // Menu, transição e sistema de continues.
-    int opcao_menu = MENU_COMECAR;
+    int opcao_menu = 0;             // 0 = COMEÇAR, 1 = SAIR
     int sair_do_jogo = 0;
     int iniciar_combate = 0;        // pede para (re)começar a luta atual
     int revivido = 0;               // jogador já usou o "reviver" nesta luta?
