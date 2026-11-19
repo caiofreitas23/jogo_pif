@@ -72,26 +72,26 @@ Jogo_Pif/
 |   └── recordes.txt               # Arquivo onde os recordes são salvos
 
 ```
-## Como executar o projeto
+## Como compilar e executar
 
 ### Pré-requisitos
 
-- GCC ou Clang
+- Compilador C: GCC ou Clang
 - Raylib instalada
-- `pkg-config` (Linux e macOS)
+- `pkg-config` no Linux e macOS
 
-Clone o repositório e entre na pasta do projeto:
+Execute os comandos a partir da pasta do projeto, pois o jogo utiliza caminhos relativos para carregar recursos e arquivos.
+
+Clone o repositório:
 
 ```bash
 git clone https://github.com/caiofreitas23/jogo_pif.git
 cd jogo_pif
 ```
 
-Execute os comandos a partir da pasta `jogo_pif`, pois o jogo pode acessar arquivos usando caminhos relativos.
-
 ### Linux (Ubuntu/Debian)
 
-Instale o compilador, o `pkg-config` e a Raylib. Em distribuições que disponibilizam o pacote, você pode usar:
+Instale o compilador e as dependências:
 
 ```bash
 sudo apt install build-essential pkg-config libraylib-dev
@@ -106,7 +106,7 @@ gcc -Wall -Wextra -Isrc src/*.c -o jogo $(pkg-config --cflags --libs raylib)
 
 ### macOS
 
-Instale a Raylib e o `pkg-config`:
+Instale o compilador e a Raylib:
 
 ```bash
 brew install raylib pkg-config
@@ -121,13 +121,19 @@ gcc -Wall -Wextra -Isrc src/*.c -o jogo $(pkg-config --cflags --libs raylib)
 
 ### Windows
 
-Instale o GCC (por exemplo, pelo MinGW-w64) e a Raylib. Se a Raylib estiver em `C:\raylib`, compile e execute no terminal, a partir da pasta do projeto:
+Instale o GCC, por exemplo pelo MinGW-w64, e a Raylib. Execute os comandos a partir da pasta do projeto.
+
+Se a Raylib estiver em `C:\raylib` e não estiver configurada nos caminhos padrão do GCC:
 
 ```bash
-gcc -Wall -Wextra -Isrc src/*.c -o jogo.exe -I"C:\raylib\include" -L"C:\raylib\lib" -lraylib -lopengl32 -lgdi32 -lwinmm
-.\jogo.exe
+gcc src/*.c -o jogo.exe -I"C:\raylib\include" -L"C:\raylib\lib" -lraylib -lopengl32 -lgdi32 -lwinmm && .\jogo.exe
 ```
 
+Caso o GCC já esteja configurado para encontrar a Raylib:
+
+```bash
+gcc src/*.c -o jogo.exe -lraylib -lopengl32 -lgdi32 -lwinmm && .\jogo.exe
+```
 
 
 ## Desenvolvimento
