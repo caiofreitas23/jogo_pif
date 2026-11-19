@@ -1121,59 +1121,55 @@ int main(void) {
     int opcao_menu = 0;             // 0 = COMEÇAR, 1 = SAIR
     int sair_do_jogo = 0;
     int iniciar_combate = 0;        // pede para (re)começar a luta atual
-    int revivido = 0;               // jogador já usou o "reviver" nesta luta?
-    int boss_reviveu = 0;           // chefe já usou o "reviver" nesta luta?
+    int revivido = 0;               // já usou o "reviver" nesta luta?
     int continues = CONTINUES_INICIAIS;
-    float tempo_transicao = TEMPO_TRANSICAO;
+    float tempo_transicao = 10.0f;
+    float duracao_transicao_atual = 10.0f;
 
-    // Nocaute (vale para o jogador e para os chefes).
-    FaseKO fase_ko = KO_NENHUM;
-    AlvoKO alvo_ko = KO_ALVO_JOGADOR;
-    int ko_definitivo = 0;          // 1 = não haverá contagem nem reviver
-    float tempo_ko = 0;
-
-    // Pontuação (calculada a partir da matriz de estatísticas) e placar.
-    Estatisticas estatisticas;
-    Estatisticas *est = &estatisticas;
-    int pontuacao = 0;
-
-    estat_zerar(est);
-
-    Registro novo_registro = {{0}, 0, 1, 1, 2026, 0, 0};
-    EstadoPlacar ep;
-
-    memset(&ep, 0, sizeof(ep));
-    placar_iniciar(&ep.placar);
-    ep.destaque = -1;
-    ep.pontos_fora = -1;
+    // Placar da partida atual e índice salvo em placar.txt.
+    RegistroPlacar placar_atual = {0};
+    int indice_placar_salvo = -1;
+    int posicao_ranking = 1;
 
     while (!WindowShouldClose() && !sair_do_jogo) {
         float tempo = GetFrameTime();
 
-        if (tela == TELA_MENU) {
-            if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
-                opcao_menu = (opcao_menu + MENU_TOTAL - 1) % MENU_TOTAL;
-            }
+        if (IsKeyPressed(KEY_F1)) {
+            mostrar_hitboxes = !mostrar_hitboxes;
+        }
 
-            if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
-                opcao_menu = (opcao_menu + 1) % MENU_TOTAL;
+        if (tempo_feedback > 0) {
+            tempo_feedback -= tempo;
+            if (tempo_feedback < 0) {
+                tempo_feedback = 0;
+            }
+        }
+
+        if (tela == TELA_MENU) {
+            if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W) ||
+                IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+                opcao_menu = (opcao_menu + 1) % 2;
             }
 
             if (IsKeyPressed(KEY_ENTER)) {
-                if (opcao_menu == MENU_COMECAR) {
-                    // Novo jogo: sempre recomeça do primeiro chefe.
+                if (opcao_menu == 0) {
+                    // Novo jogo: recomeça do primeiro chefe com transição de 10 segundos.
                     numero_boss = 1;
                     continues = CONTINUES_INICIAIS;
                     revivido = 0;
-                    boss_reviveu = 0;
-                    estat_zerar(est);
-                    pontuacao = 0;
-                    fase_ko = KO_NENHUM;
-                    tempo_transicao = TEMPO_TRANSICAO;
+
+                    preparar_lutadores_para_luta(&jogador, &boss, numero_boss);
+                    intervalo_ataque = calcular_intervalo_ataque(&boss);
+
+                    memset(&placar_atual, 0, sizeof(placar_atual));
+                    snprintf(placar_atual.jogador, sizeof(placar_atual.jogador), "%s", jogador.nome);
+                    snprintf(placar_atual.resultado, sizeof(placar_atual.resultado), "EM CURSO");
+                    indice_placar_salvo = -1;
+                    posicao_ranking = sincronizar_placar_txt(ARQUIVO_PLACAR, &placar_atual, &indice_placar_salvo);
+
+                    duracao_transicao_atual = 10.0f;
+                    tempo_transicao = duracao_transicao_atual;
                     tela = TELA_TRANSICAO;
-                } else if (opcao_menu == MENU_PLACAR) {
-                    abrir_placar(&ep);
-                    tela = TELA_PLACAR;
                 } else {
                     sair_do_jogo = 1;
                 }
@@ -1185,94 +1181,18 @@ int main(void) {
                 tempo_transicao = 0;
                 iniciar_combate = 1;
             }
-        } else if (tela == TELA_COMBATE && fase_ko != KO_NENHUM) {
-            // ---------- Sequência de nocaute ----------
-            int encerrar_luta = 0;
-
-            tempo_ko += tempo;
-
-            switch (fase_ko) {
-                case KO_QUEDA:
-                    if (tempo_ko >= NOCAUTE_DURACAO_QUEDA) {
-                        fase_ko = KO_JUIZ_ENTRA;
-                        tempo_ko = 0;
-                    }
-                    break;
-
-                case KO_JUIZ_ENTRA:
-                    if (tempo_ko >= NOCAUTE_DURACAO_JUIZ) {
-                        fase_ko = ko_definitivo ? KO_FIM : KO_CONTAGEM;
-                        tempo_ko = 0;
-                    }
-                    break;
-
-                case KO_CONTAGEM:
-                    if (alvo_ko == KO_ALVO_JOGADOR) {
-                        if (IsKeyPressed(KEY_SPACE)) {
-                            // Levantou a tempo: volta com metade da vida.
-                            jogador.hp = PLAYER_VIDA_REVIVER;
-                            revivido = 1;
-                            fase_ko = KO_LEVANTA;
-                            tempo_ko = 0;
-                        } else if (tempo_ko >= NOCAUTE_CONTAGEM_JOGADOR) {
-                            // Contagem esgotada: luta perdida.
-                            encerrar_luta = 1;
-                        }
-                    } else if (tempo_ko >= NOCAUTE_CONTAGEM_BOSS) {
-                        // O chefe sempre se levanta quando o juiz chega a 5.
-                        boss.hp = obter_vida_maxima_boss(numero_boss) / 2;
-                        boss_reviveu = 1;
-                        fase_ko = KO_LEVANTA;
-                        tempo_ko = 0;
-                    }
-                    break;
-
-                case KO_LEVANTA:
-                    if (tempo_ko >= NOCAUTE_DURACAO_LEVANTAR) {
-                        fase_ko = KO_NENHUM;
-                        tempo_ko = 0;
-                        resultado = COMBATE_EM_ANDAMENTO;
-
-                        // Depois da intervenção do juiz, o chefe volta em guarda.
-                        estado_boss = BOSS_GUARDANDO;
-                        tempo_estado = 0;
-                        tempo_recuperacao_soco = 0;
-                        tempo_contra_ataque = 0;
-                        esquiva_perfeita = 0;
-                    }
-                    break;
-
-                case KO_FIM:
-                    if (tempo_ko >= NOCAUTE_DURACAO_FIM) {
-                        encerrar_luta = 1;
-                    }
-                    break;
-
-                default:
-                    break;
-            }
-
-            if (encerrar_luta) {
-                fase_ko = KO_NENHUM;
-                tempo_ko = 0;
-                tela = TELA_FINAL;
-
-                if (resultado == COMBATE_DERROTA) {
-                    // Perdeu a luta de vez: gasta um continue.
-                    if (continues > 0) {
-                        continues--;
-                    } else {
-                        tela = TELA_GAME_OVER;
-                        placar_registro_agora(&novo_registro, pontuacao);
-                    }
-                } else if (numero_boss == 4) {
-                    // Campanha concluída.
-                    placar_registro_agora(&novo_registro, pontuacao);
-                }
-            }
         } else if (tela == TELA_COMBATE) {
             combat_atualizar(&jogador, tempo);
-            boss_update(&boss); //função da nova animação do boss
+
+            if (tempo_esquiva > 0) {
+                tempo_esquiva -= tempo;
+                jogador.esquivando = 1;
+                if (tempo_esquiva <= 0) {
+                    tempo_esquiva = 0;
+                    jogador.esquivando = 0;
+                    direcao_esquiva = ESQUIVA_NENHUMA;
+                }
+            }
 
             if (tempo_recuperacao_soco > 0) {
                 tempo_recuperacao_soco -= tempo;
@@ -1294,37 +1214,21 @@ int main(void) {
                     tempo_soco = 0;
                     soco_esquerdo = 0;
                     soco_direito = 0;
+                    soco_jogador_conectou = 0;
                 }
             }
 
-            // Socos acertam quando o chefe está se recuperando.
+            // Dispara o soco (cria a hitbox ofensiva do jogador).
             if ((IsKeyPressed(KEY_J) || IsKeyPressed(KEY_K)) &&
                 tempo_recuperacao_soco <= 0 &&
                 jogador.hp > 0 &&
-                boss.hp > 0 &&
-                estado_boss == BOSS_RECUPERANDO) {
-
-                int contra_ataque = (tempo_contra_ataque > 0 && esquiva_perfeita);
-                int dano_original = jogador.dano;
+                boss.hp > 0) {
 
                 soco_esquerdo = IsKeyPressed(KEY_J);
                 soco_direito = IsKeyPressed(KEY_K);
-                tempo_soco = 0.2f;
+                soco_jogador_conectou = 0;
+                tempo_soco = 0.22f;
                 tempo_recuperacao_soco = 0.35f;
-
-                if (contra_ataque) {
-                    jogador.dano = PLAYER_DANO_BASE * 2;
-                    tempo_contra_ataque = 0;
-                    esquiva_perfeita = 0;
-                }
-
-                combat_atacar(&jogador, &boss);
-                jogador.dano = dano_original;
-
-                // Recompensa por bater.
-                estat_registrar(est, numero_boss,
-                                contra_ataque ? STAT_CONTRA_ATAQUES : STAT_SOCOS);
-                pontuacao = estat_pontuacao(est);
             }
 
             if (IsKeyPressed(KEY_S)) {
@@ -1335,12 +1239,14 @@ int main(void) {
                 jogador.cooldown_esquiva <= 0) {
                 combat_esquivar(&jogador);
                 direcao_esquiva = ESQUIVA_ESQUERDA;
+                tempo_esquiva = duracao_esquiva;
             }
 
             if (IsKeyPressed(KEY_D) &&
                 jogador.cooldown_esquiva <= 0) {
                 combat_esquivar(&jogador);
                 direcao_esquiva = ESQUIVA_DIREITA;
+                tempo_esquiva = duracao_esquiva;
             }
 
             tempo_estado += tempo;
@@ -1350,8 +1256,6 @@ int main(void) {
                     if (tempo_estado >= intervalo_ataque) {
                         estado_boss = BOSS_PREPARANDO;
                         tempo_estado = 0;
-                        direcao_esquiva = ESQUIVA_NENHUMA;
-                        jogador.esquivando = 0;
                         direcao_ataque =
                             GetRandomValue(0, 1) == 0
                                 ? ATAQUE_ESQUERDA
@@ -1362,40 +1266,27 @@ int main(void) {
                 case BOSS_PREPARANDO:
                     if (tempo_estado >= duracao_preparacao) {
                         quantidade_ataques++;
+                        golpe_boss_conectou = 0;
+                        estado_boss = BOSS_ATACANDO;
+                        tempo_estado = 0;
+                    }
+                    break;
 
-                        int esquivou_corretamente =
-                            (direcao_ataque == ATAQUE_ESQUERDA &&
-                             direcao_esquiva == ESQUIVA_DIREITA) ||
-                            (direcao_ataque == ATAQUE_DIREITA &&
-                             direcao_esquiva == ESQUIVA_ESQUERDA);
-
-                        if (esquivou_corretamente) {
-                            jogador.esquivando = 0;
-                            jogador.cooldown_esquiva = COOLDOWN_ESQUIVA;
+                case BOSS_ATACANDO:
+                    if (tempo_estado >= duracao_ataque_boss) {
+                        // Se a hitbox do ataque do chefe não colidiu com a hurtbox do jogador,
+                        // o jogador escapou fisicamente do golpe.
+                        if (!golpe_boss_conectou && jogador.esquivando) {
                             esquiva_perfeita = 1;
                             tempo_contra_ataque = 0.8f;
+                            placar_atual.esquivas_perfeitas++;
+                            placar_atual.pontuacao += 75;
 
-                            // Recompensa por desviar.
-                            estat_registrar(est, numero_boss, STAT_ESQUIVAS);
-                            pontuacao = estat_pontuacao(est);
-                        } else {
-                            jogador.esquivando = 0;
-
-                            int dano_original = boss.dano;
-
-                            if (numero_boss == 4 &&
-                                quantidade_ataques % 3 == 0) {
-                                boss.dano = ANASTASIA_DANO_ESPECIAL;
-                            }
-
-                            combat_boss_atacar(&boss, &jogador);
-                            boss.dano = dano_original;
-
-                            esquiva_perfeita = 0;
-                            tempo_contra_ataque = 0;
+                            snprintf(texto_feedback, sizeof(texto_feedback), "ESQUIVA PERFEITA! +75");
+                            cor_feedback = SKYBLUE;
+                            tempo_feedback = 0.75f;
                         }
 
-                        direcao_esquiva = ESQUIVA_NENHUMA;
                         estado_boss = BOSS_RECUPERANDO;
                         tempo_estado = 0;
                     }
@@ -1411,6 +1302,98 @@ int main(void) {
                     break;
             }
 
+            // Calcula hitboxes/hurtboxes atuais e resolve contato por colisão.
+            int direcao_visual_esquiva = 0;
+            if (direcao_esquiva == ESQUIVA_ESQUERDA) {
+                direcao_visual_esquiva = -1;
+            } else if (direcao_esquiva == ESQUIVA_DIREITA) {
+                direcao_visual_esquiva = 1;
+            }
+
+            HitboxesCombate hitboxes = calcular_hitboxes_combate(
+                480,
+                270,
+                157,
+                jogador.esquivando,
+                direcao_visual_esquiva,
+                tempo_soco > 0 && (soco_esquerdo || soco_direito),
+                soco_esquerdo,
+                soco_direito,
+                estado_boss,
+                direcao_ataque
+            );
+
+            // 1. Colisão do soco do jogador com a guarda ou com o corpo do chefe.
+            if (tempo_soco > 0 && !soco_jogador_conectou && jogador.hp > 0 && boss.hp > 0) {
+                if (estado_boss == BOSS_GUARDANDO &&
+                    CheckCollisionRecs(hitboxes.hitbox_soco_jogador, hitboxes.hitbox_guarda_boss)) {
+                    soco_jogador_conectou = 1;
+                    snprintf(texto_feedback, sizeof(texto_feedback), "BLOQUEADO PELA GUARDA!");
+                    cor_feedback = LIGHTGRAY;
+                    tempo_feedback = 0.5f;
+                } else if (CheckCollisionRecs(hitboxes.hitbox_soco_jogador, hitboxes.hurtbox_boss)) {
+                    soco_jogador_conectou = 1;
+
+                    int dano_original = jogador.dano;
+                    int foi_contra_ataque = 0;
+
+                    if (tempo_contra_ataque > 0 && esquiva_perfeita) {
+                        jogador.dano = PLAYER_DANO_BASE * 2;
+                        tempo_contra_ataque = 0;
+                        esquiva_perfeita = 0;
+                        foi_contra_ataque = 1;
+                    }
+
+                    combat_atacar(&jogador, &boss);
+                    jogador.dano = dano_original;
+
+                    placar_atual.golpes_acertados++;
+                    placar_atual.pontuacao += foi_contra_ataque ? 150 : 50;
+
+                    snprintf(
+                        texto_feedback,
+                        sizeof(texto_feedback),
+                        foi_contra_ataque ? "CONTRA-ATAQUE! +150" : "IMPACTO! +50"
+                    );
+                    cor_feedback = foi_contra_ataque ? GOLD : GREEN;
+                    tempo_feedback = 0.6f;
+                }
+            }
+
+            // 2. Colisão do golpe do chefe com a hurtbox do jogador.
+            if (estado_boss == BOSS_ATACANDO && !golpe_boss_conectou && boss.hp > 0 && jogador.hp > 0) {
+                if (CheckCollisionRecs(hitboxes.hitbox_ataque_boss, hitboxes.hurtbox_jogador)) {
+                    golpe_boss_conectou = 1;
+
+                    int dano_original = boss.dano;
+                    if (numero_boss == 4 && quantidade_ataques % 3 == 0) {
+                        boss.dano = ANASTASIA_DANO_ESPECIAL;
+                    }
+
+                    int hp_antes = jogador.hp;
+                    combat_boss_atacar(&boss, &jogador);
+                    boss.dano = dano_original;
+
+                    esquiva_perfeita = 0;
+                    tempo_contra_ataque = 0;
+
+                    placar_atual.golpes_recebidos++;
+                    placar_atual.pontuacao -= 40;
+                    if (placar_atual.pontuacao < 0) {
+                        placar_atual.pontuacao = 0;
+                    }
+
+                    snprintf(
+                        texto_feedback,
+                        sizeof(texto_feedback),
+                        jogador.defendendo ? "DEFENDIDO! (-%d HP)" : "GOLPE SOFRIDO! (-%d HP)",
+                        hp_antes - jogador.hp
+                    );
+                    cor_feedback = jogador.defendendo ? SKYBLUE : RED;
+                    tempo_feedback = 0.75f;
+                }
+            }
+
             resultado = combat_verificar_fim(&jogador, &boss);
 
             // Empate (ambos com 0 de vida) conta como derrota do jogador.
@@ -1419,142 +1402,107 @@ int main(void) {
             }
 
             if (resultado != COMBATE_EM_ANDAMENTO) {
-                // Alguém foi nocauteado: começa a animação de queda.
-                if (resultado == COMBATE_DERROTA) {
-                    alvo_ko = KO_ALVO_JOGADOR;
-                    ko_definitivo = revivido;
-                } else {
-                    alvo_ko = KO_ALVO_BOSS;
-                    ko_definitivo = boss_reviveu;
+                tela = TELA_FINAL;
+
+                if (resultado == COMBATE_VITORIA) {
+                    if (placar_atual.chefes_derrotados < numero_boss) {
+                        placar_atual.chefes_derrotados = numero_boss;
+                        placar_atual.pontuacao += 300 * numero_boss + jogador.hp * 2;
+                    }
+
+                    if (numero_boss == 4) {
+                        placar_atual.pontuacao += continues * 200;
+                        snprintf(placar_atual.resultado, sizeof(placar_atual.resultado), "CAMPEAO");
+                    } else {
+                        snprintf(placar_atual.resultado, sizeof(placar_atual.resultado), "CHEFE %d OK", numero_boss);
+                    }
+
+                    posicao_ranking = sincronizar_placar_txt(
+                        ARQUIVO_PLACAR,
+                        &placar_atual,
+                        &indice_placar_salvo
+                    );
+                } else if (resultado == COMBATE_DERROTA && revivido) {
+                    // Segunda morte na mesma luta: gasta um continue.
+                    continues--;
+                    placar_atual.pontuacao -= 100;
+                    if (placar_atual.pontuacao < 0) {
+                        placar_atual.pontuacao = 0;
+                    }
+
+                    if (continues <= 0) {
+                        continues = 0;
+                        snprintf(placar_atual.resultado, sizeof(placar_atual.resultado), "GAME OVER");
+                        posicao_ranking = sincronizar_placar_txt(
+                            ARQUIVO_PLACAR,
+                            &placar_atual,
+                            &indice_placar_salvo
+                        );
+                        tela = TELA_GAME_OVER;
+                    } else {
+                        snprintf(placar_atual.resultado, sizeof(placar_atual.resultado), "CONTINUE");
+                        posicao_ranking = sincronizar_placar_txt(
+                            ARQUIVO_PLACAR,
+                            &placar_atual,
+                            &indice_placar_salvo
+                        );
+                    }
                 }
-
-                fase_ko = KO_QUEDA;
-                tempo_ko = 0;
-
-                jogador.defendendo = 0;
-                jogador.esquivando = 0;
-                direcao_esquiva = ESQUIVA_NENHUMA;
-                tempo_soco = 0;
-                soco_esquerdo = 0;
-                soco_direito = 0;
             }
         } else if (tela == TELA_FINAL) {
             if (resultado == COMBATE_VITORIA &&
                 numero_boss < 4 &&
                 IsKeyPressed(KEY_ENTER)) {
 
-                // Próximo chefe, sempre do mais fácil para o mais difícil.
+                // Avança para o próximo chefe com tela de transição de 5 segundos.
                 numero_boss++;
-                iniciar_combate = 1;
+                revivido = 0;
+                preparar_lutadores_para_luta(&jogador, &boss, numero_boss);
+                intervalo_ataque = calcular_intervalo_ataque(&boss);
+
+                duracao_transicao_atual = 5.0f;
+                tempo_transicao = duracao_transicao_atual;
+                tela = TELA_TRANSICAO;
             } else if (resultado == COMBATE_VITORIA &&
                        numero_boss == 4 &&
                        IsKeyPressed(KEY_ENTER)) {
 
-                // Campanha concluída: registra a pontuação.
+                // Campanha concluída: volta ao menu.
                 numero_boss = 1;
                 continues = CONTINUES_INICIAIS;
                 revivido = 0;
-                opcao_menu = MENU_COMECAR;
-                tela = abrir_fim_de_partida(&ep, novo_registro.pontos);
-            } else if (resultado == COMBATE_DERROTA) {
-                if (IsKeyPressed(KEY_ENTER)) {
-                    // Usa o continue (já descontado): recomeça a MESMA luta do zero.
-                    iniciar_combate = 1;
-                } else if (IsKeyPressed(KEY_G)) {
-                    // Desistiu: a partida termina agora.
-                    placar_registro_agora(&novo_registro, pontuacao);
-                    numero_boss = 1;
-                    continues = CONTINUES_INICIAIS;
-                    revivido = 0;
-                    opcao_menu = MENU_COMECAR;
-                    tela = abrir_fim_de_partida(&ep, novo_registro.pontos);
-                }
+                opcao_menu = 0;
+                tela = TELA_MENU;
+            } else if (resultado == COMBATE_DERROTA &&
+                       !revivido &&
+                       IsKeyPressed(KEY_ENTER)) {
+
+                // Primeira morte: revive com metade da vida no ponto em que parou.
+                jogador.hp = PLAYER_VIDA_REVIVER;
+                jogador.defendendo = 0;
+                jogador.esquivando = 0;
+                jogador.cooldown_defesa = 0;
+                jogador.cooldown_esquiva = 0;
+
+                direcao_esquiva = ESQUIVA_NENHUMA;
+                tempo_esquiva = 0;
+                revivido = 1;
+                resultado = COMBATE_EM_ANDAMENTO;
+                tela = TELA_COMBATE;
+            } else if (resultado == COMBATE_DERROTA &&
+                       revivido &&
+                       IsKeyPressed(KEY_ENTER)) {
+
+                // Segunda morte: o continue já foi gasto; recomeça a mesma luta.
+                iniciar_combate = 1;
             }
         } else if (tela == TELA_GAME_OVER) {
             if (IsKeyPressed(KEY_ENTER)) {
-                // Perdeu todos os continues: registra a pontuação.
                 numero_boss = 1;
                 continues = CONTINUES_INICIAIS;
                 revivido = 0;
-                opcao_menu = MENU_COMECAR;
-                tela = abrir_fim_de_partida(&ep, novo_registro.pontos);
-            }
-        } else if (tela == TELA_NOME) {
-            int c = GetCharPressed();
-
-            while (c > 0) {
-                if (c < 128 && isalpha(c) && ep.tam_nome < PLACAR_TAM_NOME) {
-                    ep.nome[ep.tam_nome++] = (char)toupper(c);
-                    ep.nome[ep.tam_nome] = '\0';
-                }
-
-                c = GetCharPressed();
-            }
-
-            if (IsKeyPressed(KEY_BACKSPACE) && ep.tam_nome > 0) {
-                ep.nome[--ep.tam_nome] = '\0';
-            }
-
-            if (IsKeyPressed(KEY_ENTER) && ep.tam_nome == PLACAR_TAM_NOME) {
-                Registro r = novo_registro;
-
-                strncpy(r.nome, ep.nome, PLACAR_TAM_NOME);
-                r.nome[PLACAR_TAM_NOME] = '\0';
-
-                ep.destaque = placar_inserir(&ep.placar, &r);
-                placar_salvar(&ep.placar);
-
-                ep.opcao = 0;
-                ep.confirmar_apagar = 0;
-                tela = TELA_PLACAR;
-            }
-        } else if (tela == TELA_PLACAR) {
-            int ativar = IsKeyPressed(KEY_ENTER);
-            Vector2 mouse = GetMousePosition();
-            Vector2 movimento = GetMouseDelta();
-            int i;
-
-            if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) {
-                ep.opcao = 0;
-                ep.confirmar_apagar = 0;
-            }
-
-            if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) {
-                ep.opcao = 1;
-            }
-
-            for (i = 0; i < 2; i++) {
-                if (CheckCollisionPointRec(mouse, retangulo_botao_placar(i))) {
-                    if (movimento.x != 0 || movimento.y != 0) {
-                        if (ep.opcao != i) {
-                            ep.confirmar_apagar = 0;
-                        }
-                        ep.opcao = i;
-                    }
-
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                        if (ep.opcao != i) {
-                            ep.confirmar_apagar = 0;
-                        }
-                        ep.opcao = i;
-                        ativar = 1;
-                    }
-                }
-            }
-
-            if (ativar) {
-                if (ep.opcao == 0) {
-                    ep.confirmar_apagar = 0;
-                    tela = TELA_MENU;
-                } else if (!ep.confirmar_apagar) {
-                    // Primeiro clique só pede confirmação.
-                    ep.confirmar_apagar = 1;
-                } else {
-                    placar_apagar(&ep.placar);
-                    ep.destaque = -1;
-                    ep.pontos_fora = -1;
-                    ep.confirmar_apagar = 0;
-                }
+                opcao_menu = 0;
+                tela = TELA_MENU;
             }
         }
 
@@ -1571,24 +1519,19 @@ int main(void) {
                 &tempo_soco,
                 &tempo_recuperacao_soco,
                 &tempo_contra_ataque,
+                &tempo_esquiva,
                 &quantidade_ataques,
                 &soco_esquerdo,
                 &soco_direito,
+                &soco_jogador_conectou,
+                &golpe_boss_conectou,
                 &esquiva_perfeita,
                 &resultado
             );
 
             revivido = 0;
-            boss_reviveu = 0;
-            fase_ko = KO_NENHUM;
-            tempo_ko = 0;
             direcao_esquiva = ESQUIVA_NENHUMA;
-
-            intervalo_ataque = 2.8f - boss.velocidade * 0.15f;
-            if (intervalo_ataque < 1.4f) {
-                intervalo_ataque = 1.4f;
-            }
-
+            intervalo_ataque = calcular_intervalo_ataque(&boss);
             tela = TELA_COMBATE;
         }
 
@@ -1597,18 +1540,22 @@ int main(void) {
         if (tela == TELA_MENU) {
             desenhar_menu(opcao_menu);
         } else if (tela == TELA_TRANSICAO) {
-            desenhar_transicao(tempo_transicao);
+            desenhar_transicao(
+                tempo_transicao,
+                duracao_transicao_atual,
+                &jogador,
+                &boss,
+                numero_boss,
+                continues,
+                placar_atual.pontuacao
+            );
         } else if (tela == TELA_COMBATE) {
-            int em_nocaute = (fase_ko != KO_NENHUM);
-            float angulo = angulo_nocaute(fase_ko, tempo_ko);
-            float ang_jogador = (em_nocaute && alvo_ko == KO_ALVO_JOGADOR) ? -angulo : 0.0f;
-            float ang_boss = (em_nocaute && alvo_ko == KO_ALVO_BOSS) ? -angulo : 0.0f;
-
             desenhar_arena();
 
-            DrawText("BEYOND THE FALLEN", 326, 28, 28, RAYWHITE);
+            DrawText("BEYOND THE FALLEN", 326, 22, 28, RAYWHITE);
             desenhar_texto_centralizado(
-                TextFormat("PONTOS: %d", pontuacao), 62, 20, (Color){255, 205, 55, 255}
+                TextFormat("PLACAR: %d PTS", placar_atual.pontuacao),
+                54, 18, GOLD
             );
 
             // Vida do jogador.
@@ -1646,7 +1593,6 @@ int main(void) {
             if (hp_boss > hp_maximo_boss) hp_boss = hp_maximo_boss;
 
             DrawText(boss.nome, 650, 77, 22, RED);
-            DrawText(PAPEIS_CHEFES[numero_boss - 1], 650, 58, 14, (Color){200, 190, 150, 255});
             DrawText(TextFormat("%d", boss.hp), 650, 105, 19, RAYWHITE);
             DrawRectangle(690, 111, 220, 17, DARKGRAY);
             DrawRectangle(
@@ -1655,59 +1601,32 @@ int main(void) {
                 17,
                 (Color){220, 45, 55, 255}
             );
-            DrawText(
-                TextFormat("REVIVER: %s", boss_reviveu ? "USADO" : "DISPONÍVEL"),
-                690, 135, 16,
-                (Color){190, 195, 205, 255}
-            );
 
-            // Cor da roupa (ou do pelo, no caso da ursa Anastasia).
-            int ursa = (numero_boss == 4);
-            Color roupa_boss = cor_uniforme(numero_boss, estado_boss);
+            Color roupa_boss = (Color){155, 45, 45, 255};
 
-            // Chefe ao fundo, de frente para o jogador (gira ao cair).
-            int topo_boss = ursa ? 140 : 157;
+            if (estado_boss == BOSS_PREPARANDO) {
+                roupa_boss = (Color){205, 85, 40, 255};
+            } else if (estado_boss == BOSS_ATACANDO) {
+                roupa_boss = (Color){235, 45, 45, 255};
+            } else if (estado_boss == BOSS_RECUPERANDO) {
+                roupa_boss = (Color){115, 55, 55, 255};
+            }
 
             // Sombras no piso para dar profundidade.
-            int largura_sombra = ursa ? 66 : (numero_boss == 1 ? 56 : 42);
-            DrawEllipse(480, topo_boss + (ursa ? 173 : 153), largura_sombra, 9, (Color){15, 16, 18, 120});
+            DrawEllipse(480, 386, 37, 9, (Color){15, 16, 18, 120});
             DrawEllipse(480, 505, 92, 15, (Color){15, 16, 18, 150});
 
-            int pivo_boss_y = topo_boss + (ursa ? 110 : 105);
-            int boss_em_guarda = (!em_nocaute && estado_boss == BOSS_GUARDANDO);
-            int boss_atacando = (!em_nocaute && estado_boss == BOSS_PREPARANDO);
-            int lado_boss = (direcao_ataque == ATAQUE_ESQUERDA) ? -1 : 1;
+            // Chefe ao fundo, de frente para o jogador.
+            desenhar_boss_de_frente(
+                480,
+                157,
+                roupa_boss,
+                (Color){218, 178, 132, 255},
+                estado_boss,
+                direcao_ataque == ATAQUE_ESQUERDA ? -1 : 1
+            );
 
-            rlPushMatrix();
-            rlTranslatef(480.0f, (float)pivo_boss_y, 0.0f);
-            rlRotatef(ang_boss, 0.0f, 0.0f, 1.0f);
-            rlTranslatef(-480.0f, (float)(-pivo_boss_y), 0.0f);
-
-            if (ursa) {
-                desenhar_urso_de_frente(
-                    480, topo_boss, roupa_boss,
-                    boss_atacando, boss_em_guarda, lado_boss
-                );
-            } else {
-                desenhar_boss_de_frente(
-                    480, topo_boss, numero_boss, roupa_boss,
-                    boss_atacando, boss_em_guarda, lado_boss
-                );
-            }
-
-            rlPopMatrix();
-
-            if (em_nocaute && alvo_ko == KO_ALVO_BOSS) {
-                // Cabeça do chefe caído: à esquerda do pivô.
-                desenhar_estrelas(
-                    480.0f - (float)(pivo_boss_y - (topo_boss + 25)),
-                    (float)pivo_boss_y,
-                    22.0f
-                );
-                desenhar_juiz_nocaute(alvo_ko, fase_ko, tempo_ko);
-            }
-
-            // Jogador em primeiro plano, visto de costas (gira ao cair).
+            // Jogador em primeiro plano, visto de costas.
             int direcao_visual_esquiva = 0;
             if (direcao_esquiva == ESQUIVA_ESQUERDA) {
                 direcao_visual_esquiva = -1;
@@ -1715,127 +1634,172 @@ int main(void) {
                 direcao_visual_esquiva = 1;
             }
 
-            rlPushMatrix();
-            rlTranslatef(480.0f, 445.0f, 0.0f);
-            rlRotatef(ang_jogador, 0.0f, 0.0f, 1.0f);
-            rlTranslatef(-480.0f, -445.0f, 0.0f);
+            int jogador_atacando = tempo_soco > 0 && (soco_esquerdo || soco_direito);
 
             desenhar_jogador_de_costas(
                 480,
                 270,
-                tempo_soco > 0 && (soco_esquerdo || soco_direito),
+                jogador_atacando,
+                soco_esquerdo,
                 jogador.defendendo,
                 jogador.esquivando,
                 direcao_visual_esquiva
             );
 
-            rlPopMatrix();
-
             if (jogador.defendendo) {
+                int dx_escudo = jogador.esquivando ? (direcao_visual_esquiva * 55) : 0;
                 DrawEllipseLines(
-                    480, 386, 91, 113,
+                    480 + dx_escudo, 386, 91, 113,
                     (Color){80, 170, 255, 180}
                 );
             }
 
-            if (em_nocaute && alvo_ko == KO_ALVO_JOGADOR) {
-                desenhar_estrelas(480.0f - 117.0f, 445.0f, 36.0f);
-                desenhar_juiz_nocaute(alvo_ko, fase_ko, tempo_ko);
+            // Visualização opcional das hitboxes/hurtboxes (tecla F1).
+            if (mostrar_hitboxes) {
+                HitboxesCombate hb = calcular_hitboxes_combate(
+                    480,
+                    270,
+                    157,
+                    jogador.esquivando,
+                    direcao_visual_esquiva,
+                    jogador_atacando,
+                    soco_esquerdo,
+                    soco_direito,
+                    estado_boss,
+                    direcao_ataque
+                );
+
+                DrawRectangleLinesEx(hb.hurtbox_jogador, 2, LIME);
+                DrawRectangleLinesEx(hb.hurtbox_boss, 2, YELLOW);
+
+                if (jogador_atacando) {
+                    DrawRectangleLinesEx(hb.hitbox_soco_jogador, 2, SKYBLUE);
+                }
+                if (estado_boss == BOSS_GUARDANDO) {
+                    DrawRectangleLinesEx(hb.hitbox_guarda_boss, 2, LIGHTGRAY);
+                }
+                if (estado_boss == BOSS_ATACANDO) {
+                    DrawRectangleLinesEx(hb.hitbox_ataque_boss, 2, RED);
+                }
             }
 
-            if (!em_nocaute) {
-                // Controles.
-                DrawText("J/K: SOCO", 95, 475, 18, RAYWHITE);
-                DrawText("S: DEFESA", 400, 475, 18, RAYWHITE);
-                DrawText("A/D: ESQUIVA", 700, 475, 18, RAYWHITE);
-
-                DrawText(
-                    TextFormat("ESQUIVA %.1f", jogador.cooldown_esquiva),
-                    95, 505, 16,
-                    (Color){190, 195, 205, 255}
-                );
-                DrawText(
-                    TextFormat("DEFESA %.1f", jogador.cooldown_defesa),
-                    400, 505, 16,
-                    (Color){190, 195, 205, 255}
-                );
-            } else {
-                // Mensagens do nocaute.
-                if (tempo_ko < 0.25f && fase_ko == KO_QUEDA) {
-                    DrawRectangle(
-                        0, 0, LARGURA_TELA, ALTURA_TELA,
-                        Fade(WHITE, 0.6f * (1.0f - tempo_ko / 0.25f))
-                    );
-                }
-
-                if (fase_ko == KO_QUEDA || fase_ko == KO_JUIZ_ENTRA || fase_ko == KO_FIM) {
-                    desenhar_texto_centralizado("NOCAUTE!", 172, 64, BLACK);
-                    desenhar_texto_centralizado("NOCAUTE!", 168, 64, RED);
-                }
-
-                if (fase_ko == KO_CONTAGEM && alvo_ko == KO_ALVO_JOGADOR) {
-                    if (((int)(GetTime() * 3.0)) % 2 == 0) {
-                        desenhar_texto_centralizado(
-                            "APERTE ESPAÇO PARA LEVANTAR!", 340, 30, YELLOW
-                        );
-                    }
-                } else if (fase_ko == KO_CONTAGEM) {
-                    DrawText(
-                        "O chefe tenta se levantar...", 40, 505, 18,
-                        (Color){190, 195, 205, 255}
-                    );
-                }
+            if (tempo_feedback > 0) {
+                desenhar_texto_centralizado(texto_feedback, 165, 22, cor_feedback);
             }
+
+            // Controles.
+            DrawText("J/K: SOCO", 95, 475, 18, RAYWHITE);
+            DrawText("S: DEFESA", 400, 475, 18, RAYWHITE);
+            DrawText("A/D: ESQUIVA", 700, 475, 18, RAYWHITE);
+
+            DrawText(
+                TextFormat("ESQUIVA %.1f", jogador.cooldown_esquiva),
+                95, 505, 16,
+                (Color){190, 195, 205, 255}
+            );
+            DrawText(
+                TextFormat("DEFESA %.1f", jogador.cooldown_defesa),
+                400, 505, 16,
+                (Color){190, 195, 205, 255}
+            );
+            DrawText(
+                "F1: HITBOXES",
+                700, 505, 16,
+                (Color){140, 145, 155, 255}
+            );
         } else if (tela == TELA_FINAL) {
             ClearBackground((Color){22, 24, 29, 255});
 
             if (resultado == COMBATE_VITORIA && numero_boss < 4) {
-                desenhar_texto_centralizado("VITORIA", 170, 52, GREEN);
+                desenhar_texto_centralizado("VITÓRIA!", 110, 52, GREEN);
                 desenhar_texto_centralizado(
-                    TextFormat("PONTOS: %d", pontuacao), 235, 24,
-                    (Color){255, 205, 55, 255}
+                    TextFormat(
+                        "Placar Atual: %d pts  |  Ranking (%s): #%d",
+                        placar_atual.pontuacao,
+                        ARQUIVO_PLACAR,
+                        posicao_ranking
+                    ),
+                    195, 22, YELLOW
                 );
-                desenhar_texto_centralizado("ENTER: PRÓXIMO COMBATE", 285, 22, RAYWHITE);
+                desenhar_texto_centralizado(
+                    "Progresso salvo em placar.txt",
+                    232, 18, (Color){190, 195, 205, 255}
+                );
+                desenhar_texto_centralizado(
+                    "ENTER: PRÓXIMO COMBATE",
+                    310, 24, RAYWHITE
+                );
             } else if (resultado == COMBATE_VITORIA) {
-                desenhar_texto_centralizado("CAMPEÃO", 40, 52, (Color){255, 205, 55, 255});
-                desenhar_texto_centralizado("VOCÊ VENCEU A CAMPANHA", 105, 24, RAYWHITE);
                 desenhar_texto_centralizado(
-                    TextFormat("PONTUAÇÃO: %d", pontuacao), 145, 30,
+                    "CAMPEÃO",
+                    95, 52,
                     (Color){255, 205, 55, 255}
                 );
-                desenhar_resumo(est, 205);
-                desenhar_texto_centralizado("ENTER: REGISTRAR PONTUAÇÃO", 440, 22, RAYWHITE);
-            } else {
-                desenhar_texto_centralizado("DERROTA", 150, 52, RED);
                 desenhar_texto_centralizado(
-                    TextFormat("CONTINUES RESTANTES: %d", continues),
-                    235, 24, RAYWHITE
+                    "VOCÊ VENCEU A CAMPANHA!",
+                    165, 24, RAYWHITE
                 );
                 desenhar_texto_centralizado(
-                    "ENTER: RECOMEÇAR A LUTA DO ZERO", 285, 24, YELLOW
+                    TextFormat(
+                        "Pontuação Final: %d pts  |  Ranking (%s): #%d",
+                        placar_atual.pontuacao,
+                        ARQUIVO_PLACAR,
+                        posicao_ranking
+                    ),
+                    220, 22, YELLOW
                 );
                 desenhar_texto_centralizado(
-                    "G: DESISTIR E IR PARA O PLACAR", 330, 24,
+                    TextFormat(
+                        "Acertos: %d  |  Esquivas: %d  |  Golpes Sofridos: %d",
+                        placar_atual.golpes_acertados,
+                        placar_atual.esquivas_perfeitas,
+                        placar_atual.golpes_recebidos
+                    ),
+                    258, 19, (Color){190, 195, 205, 255}
+                );
+                desenhar_texto_centralizado(
+                    "Placar final registrado em placar.txt",
+                    295, 18, GREEN
+                );
+                desenhar_texto_centralizado(
+                    "ENTER: VOLTAR AO MENU",
+                    365, 22, RAYWHITE
+                );
+            } else if (!revivido) {
+                // Primeira morte da luta.
+                desenhar_texto_centralizado("VOCÊ CAIU!", 150, 52, RED);
+                desenhar_texto_centralizado(
+                    "Você pode se levantar uma vez nesta luta.", 235, 22, RAYWHITE
+                );
+                desenhar_texto_centralizado(
+                    TextFormat("ENTER: REVIVER COM %d DE VIDA", PLAYER_VIDA_REVIVER),
+                    285, 24, YELLOW
+                );
+                desenhar_texto_centralizado(
+                    "A vida do chefe e o andamento da luta continuam.", 330, 20,
                     (Color){190, 195, 205, 255}
                 );
+            } else {
+                // Segunda morte: um continue foi gasto.
+                desenhar_texto_centralizado("DERROTA", 135, 52, RED);
                 desenhar_texto_centralizado(
-                    TextFormat("PONTUAÇÃO ATUAL: %d", pontuacao), 400, 22,
-                    (Color){255, 205, 55, 255}
+                    TextFormat("CONTINUES RESTANTES: %d", continues),
+                    215, 24, RAYWHITE
+                );
+                desenhar_texto_centralizado(
+                    TextFormat("Placar atualizado em placar.txt: %d pts", placar_atual.pontuacao),
+                    255, 18, (Color){190, 195, 205, 255}
+                );
+                desenhar_texto_centralizado(
+                    "ENTER: RECOMEÇAR A LUTA DO ZERO", 315, 24, YELLOW
                 );
             }
         } else if (tela == TELA_GAME_OVER) {
-            desenhar_game_over(pontuacao, est);
-        } else if (tela == TELA_NOME) {
-            desenhar_tela_nome(&ep, &novo_registro);
-        } else if (tela == TELA_PLACAR) {
-            desenhar_placar(&ep);
+            desenhar_game_over(&placar_atual, posicao_ranking);
         }
 
         EndDrawing();
     }
-
-    // libera os nos da lista do placar
-    placar_liberar(&ep.placar);
 
     CloseWindow();
     return 0;
