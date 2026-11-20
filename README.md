@@ -4,6 +4,9 @@
 
 > **Status:** conceito pronto e desenvolvimento completo.
 
+## Vídeo de apresentação
+[link do video](https://youtu.be/8_hkwWrVQO8)
+
 ## História
 
 Você é um prisioneiro soviético em um gulag. Para conquistar a liberdade, terá de enfrentar outros detentos — cada um com sua própria história, personalidade e estilo de luta.
